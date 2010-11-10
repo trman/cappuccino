@@ -51,8 +51,6 @@ CPInformationalAlertStyle   = 1;
 */
 CPCriticalAlertStyle        = 2;
 
-var CPAlertLabelOffset      = 3.0;
-
 /*!
     @ingroup appkit
 
@@ -77,25 +75,25 @@ var CPAlertLabelOffset      = 3.0;
 */
 @implementation CPAlert : CPView
 {
-    CPTextField     _messageLabel           @accessors(getter=messageText);
-    CPTextField     _informativeLabel       @accessors(getter=informativeText);
-    CPAlertStyle    _alertStyle             @accessors(property=alertStyle);
-    id              _delegate               @accessors(property=delegate);
-    CPView          _accessoryView          @accessors(getter=accessoryView);
     BOOL            _showHelp               @accessors(getter=showsHelp, setter=setShowsHelp:);
-    CPString        _helpAnchor             @accessors(property=helpAnchor);
-    CPImage         _icon                   @accessors(property=icon);
     BOOL            _showSupressionButton   @accessors(getter=showsSupressionButton);
+    CPAlertStyle    _alertStyle             @accessors(property=alertStyle);
+    CPArray         _buttons                @accessors(getter=buttons);
     CPCheckBox      _supressionButton       @accessors(getter=suppressionButton);
+    CPImage         _icon                   @accessors(property=icon);
+    CPString        _helpAnchor             @accessors(property=helpAnchor);
+    CPView          _accessoryView          @accessors(getter=accessoryView);
+    id              _delegate               @accessors(property=delegate);
 
     BOOL            _needsLayout;
-    CPImageView     _alertImageView;
     CPButton        _alertHelpButton;
-    int             _windowStyle;
-    CPArray         _buttons;
+    CPImageView     _alertImageView;
     CPPanel         _alertPanel;
-    SEL             _didEndSelector;
+    CPTextField     _informativeLabel;
+    CPTextField     _messageLabel;
     id              _modalDelegate;
+    int             _windowStyle;
+    SEL             _didEndSelector;
 }
 
 
@@ -225,6 +223,36 @@ var CPAlertLabelOffset      = 3.0;
     _needsLayout = YES;
 }
 
+/*! return the content of the message text
+    @return CPString containing the message text
+*/
+- (CPString)messageText
+{
+    return [_messageLabel stringValue];
+}
+
+/*! @deprecated
+    set the text of the alert's message
+
+    @param aText CPString containing the text
+*/
+- (void)setTitle:(CPString)aText
+{
+    CPLog.warn("DEPRECATED: 'setTitle:' is deprecated. please use 'setMessageText:'")
+    [self setMessageText:aText];
+}
+
+/*! @deprecated
+    set the text of the alert's message
+
+    @param aText CPString containing the text
+*/
+- (CPString)title
+{
+    CPLog.warn("DEPRECATED: 'title' is deprecated. please use 'messageText'");
+    return [_messageLabel stringValue];
+}
+
 /*! set the text of the alert's informative text
 
     @param aText CPString containing the informative text
@@ -233,6 +261,15 @@ var CPAlertLabelOffset      = 3.0;
 {
     [_informativeLabel setStringValue:aText];
     _needsLayout = YES;
+}
+
+/*! return the content of the message text
+    
+    @return CPString containing the message text
+*/
+- (CPString)informativeText
+{
+    return [_informativeLabel stringValue];
 }
 
 /*! set the accessory view
@@ -254,6 +291,10 @@ var CPAlertLabelOffset      = 3.0;
     _showSupressionButton = shouldShowSupressionButton;
     _needsLayout = YES;
 }
+
+
+#pragma mark -
+#pragma mark Buttons management
 
 /*!
     Adds a button with a given title to the receiver.
@@ -291,7 +332,6 @@ var CPAlertLabelOffset      = 3.0;
 }
 
 
-
 #pragma mark -
 #pragma mark Layouting
 
@@ -322,6 +362,7 @@ var CPAlertLabelOffset      = 3.0;
 - (void)_layoutInformativeView
 {
     var inset = [self currentValueForThemeAttribute:@"content-inset"],
+        defaultElementsMargin = [self currentValueForThemeAttribute:@"default-elements-margin"],
         sizeWithFontCorrection = 6.0,
         informativeLabelWidth,
         informativeLabelOriginY,
@@ -335,7 +376,7 @@ var CPAlertLabelOffset      = 3.0;
     [_informativeLabel setLineBreakMode:CPLineBreakByWordWrapping];
 
     informativeLabelWidth = [_alertPanel frame].size.width - inset.left - inset.right,
-    informativeLabelOriginY = [_messageLabel frameOrigin].y + [_messageLabel frameSize].height + CPAlertLabelOffset,
+    informativeLabelOriginY = [_messageLabel frameOrigin].y + [_messageLabel frameSize].height + defaultElementsMargin,
     informativeLabelTextSize = [[_informativeLabel stringValue] sizeWithFont:[_informativeLabel font] inWidth:informativeLabelWidth];
 
     [_informativeLabel setFrame:CGRectMake(inset.left, informativeLabelOriginY, informativeLabelTextSize.width, informativeLabelTextSize.height + sizeWithFontCorrection)];
@@ -348,8 +389,9 @@ var CPAlertLabelOffset      = 3.0;
     if (_accessoryView)
     {
         var inset = [self currentValueForThemeAttribute:@"content-inset"],
+            defaultElementsMargin = [self currentValueForThemeAttribute:@"default-elements-margin"],
             accessoryViewWidth = [_alertPanel frame].size.width - inset.left - inset.right,
-            accessoryViewOriginY = CPRectGetMaxY([_informativeLabel frame]) + CPAlertLabelOffset;
+            accessoryViewOriginY = CPRectGetMaxY([_informativeLabel frame]) + defaultElementsMargin;
 
         [_accessoryView setFrameOrigin:CGPointMake(inset.left, accessoryViewOriginY)];
         [[_alertPanel contentView] addSubview:_accessoryView];
@@ -365,7 +407,8 @@ var CPAlertLabelOffset      = 3.0;
         var inset = [self currentValueForThemeAttribute:@"content-inset"],
             suppressionViewXOffset = [self currentValueForThemeAttribute:@"supression-button-x-offset"],
             suppressionViewYOffset = [self currentValueForThemeAttribute:@"supression-button-y-offset"],
-            suppressionButtonViewOriginY = CPRectGetMaxY([(_accessoryView || _informativeLabel) frame]) + CPAlertLabelOffset + suppressionViewYOffset;
+            defaultElementsMargin = [self currentValueForThemeAttribute:@"default-elements-margin"],
+            suppressionButtonViewOriginY = CPRectGetMaxY([(_accessoryView || _informativeLabel) frame]) + defaultElementsMargin + suppressionViewYOffset;
 
         [_supressionButton setFrameOrigin:CGPointMake(inset.left + suppressionViewXOffset, suppressionButtonViewOriginY)];
         [[_alertPanel contentView] addSubview:_supressionButton];
@@ -381,6 +424,7 @@ var CPAlertLabelOffset      = 3.0;
         buttonOffset = [self currentValueForThemeAttribute:@"button-offset"],
         helpLeftOffset = [self currentValueForThemeAttribute:@"help-image-left-offset"],
         aRepresentativeButton = [_buttons objectAtIndex:0],
+        defaultElementsMargin = [self currentValueForThemeAttribute:@"default-elements-margin"],
         panelSize = [_alertPanel frame].size,
         buttonsOriginY,
         offsetX;
@@ -388,7 +432,7 @@ var CPAlertLabelOffset      = 3.0;
     [aRepresentativeButton setTheme:[self theme]];
     [aRepresentativeButton sizeToFit];
 
-    panelSize.height = CPRectGetMaxY([lastView frame]) + CPAlertLabelOffset + [aRepresentativeButton frameSize].height;
+    panelSize.height = CPRectGetMaxY([lastView frame]) + defaultElementsMargin + [aRepresentativeButton frameSize].height;
 
     if (panelSize.height < minimumSize.height)
         panelSize.height = minimumSize.height;
@@ -594,7 +638,8 @@ var CPAlertLabelOffset      = 3.0;
                                                 [CPNull null],
                                                 [CPNull null],
                                                 0.0,
-                                                0.0
+                                                0.0,
+                                                3.0
                                                 ]
                                        forKeys:[@"size", @"content-inset", @"informative-offset", @"button-offset",
                                                 @"message-text-alignment", @"message-text-color", @"message-text-font", @"message-text-shadow-color", @"message-text-shadow-offset",
@@ -607,7 +652,8 @@ var CPAlertLabelOffset      = 3.0;
                                                 @"help-image-left-offset",
                                                 @"help-image-pressed",
                                                 @"supression-button-y-offset",
-                                                @"supression-button-x-offset"
+                                                @"supression-button-x-offset",
+                                                @"default-elements-margin"
                                                 ]];
 }
 
