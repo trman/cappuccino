@@ -517,6 +517,8 @@ CPButtonImageOffset   = 3.0;
         case CPRoundedBezelStyle:
             contentInset = [self currentValueForThemeAttribute:@"content-inset-rounded"];
             break;
+        default:
+            contentInset = [self currentValueForThemeAttribute:@"content-inset"];
     }
     
     size.width = MAX(size.width + contentInset.left + contentInset.right, minSize.width);
