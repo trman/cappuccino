@@ -70,7 +70,13 @@ CPPushInCellMask            = CPPushInButtonMask;
 CPChangeGrayCellMask        = CPGrayButtonMask;
 CPChangeBackgroundCellMask  = CPBackgroundButtonMask;
 
-CPButtonStateMixed  = CPThemeState("mixed");
+CPButtonStateMixed                  = CPThemeState("mixed");
+CPButtonStateBezelStyleRounded      = CPThemeState("rounded");
+
+// add all future correspondance between bezel styles and theme state here.
+var CPButtonBezelStyleStateMap = [CPDictionary dictionaryWithObjects:[CPButtonStateBezelStyleRounded, nil]
+                                                             forKeys:[CPRoundedBezelStyle, CPRoundRectBezelStyle]];
+
 
 CPButtonDefaultHeight = 24.0;
 CPButtonImageOffset   = 3.0;
@@ -107,18 +113,6 @@ CPButtonImageOffset   = 3.0;
     return [self buttonWithTitle:aTitle theme:[CPTheme defaultTheme]];
 }
 
-+ (id)buttonWithTitle:(CPString)aTitle bezelStyle:(int)aBezelStyle
-{
-    var button = [[self alloc] init];
-
-    [button setTheme:[CPTheme defaultTheme]];
-    [button setTitle:aTitle];
-    [button setBezelStyle:aBezelStyle];
-    [button sizeToFit];
-    
-    return button;
-}
-
 + (id)buttonWithTitle:(CPString)aTitle theme:(CPTheme)aTheme
 {
     var button = [[self alloc] init];
@@ -137,22 +131,8 @@ CPButtonImageOffset   = 3.0;
 
 + (id)themeAttributes
 {
-    return [CPDictionary dictionaryWithObjects:[[CPNull null], 
-                                                0.0, 
-                                                _CGInsetMakeZero(),
-                                                _CGInsetMakeZero(), 
-                                                [CPNull null],
-                                                [CPNull null],
-                                                _CGInsetMakeZero()
-                                                ]
-                                       forKeys:[@"image",
-                                                @"image-offset", 
-                                                @"bezel-inset", 
-                                                @"content-inset", 
-                                                @"bezel-color",
-                                                @"bezel-rounded-color",
-                                                @"content-inset-rounded"
-                                                ]];
+    return [CPDictionary dictionaryWithObjects:[[CPNull null], 0.0, _CGInsetMakeZero(), _CGInsetMakeZero(), [CPNull null]]
+                                       forKeys:[@"image", @"image-offset", @"bezel-inset", @"content-inset", @"bezel-color"]];
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -505,22 +485,10 @@ CPButtonImageOffset   = 3.0;
     else
         size = [([self title] || " ") sizeWithFont:[self currentValueForThemeAttribute:@"font"]];
 
-    var minSize = [self currentValueForThemeAttribute:@"min-size"],
-        maxSize = [self currentValueForThemeAttribute:@"max-size"],
-        contentInset;
-    
-    switch (_bezelStyle)
-    {
-        case CPRoundRectBezelStyle:
-            contentInset = [self currentValueForThemeAttribute:@"content-inset"];
-            break;
-        case CPRoundedBezelStyle:
-            contentInset = [self currentValueForThemeAttribute:@"content-inset-rounded"];
-            break;
-        default:
-            contentInset = [self currentValueForThemeAttribute:@"content-inset"];
-    }
-    
+    var contentInset = [self currentValueForThemeAttribute:@"content-inset"],
+        minSize = [self currentValueForThemeAttribute:@"min-size"],
+        maxSize = [self currentValueForThemeAttribute:@"max-size"];
+
     size.width = MAX(size.width + contentInset.left + contentInset.right, minSize.width);
     size.height = MAX(size.height + contentInset.top + contentInset.bottom, minSize.height);
 
@@ -566,21 +534,8 @@ CPButtonImageOffset   = 3.0;
     var bezelView = [self layoutEphemeralSubviewNamed:@"bezel-view"
                                            positioned:CPWindowBelow
                       relativeToEphemeralSubviewNamed:@"content-view"];
-    
-    switch (_bezelStyle)
-    {
-        case CPRoundRectBezelStyle:
-            [bezelView setBackgroundColor:[self currentValueForThemeAttribute:@"bezel-color"]];
-            break;
-        
-        case CPRoundedBezelStyle:
-            [bezelView setBackgroundColor:[self currentValueForThemeAttribute:@"bezel-rounded-color"]];
-            break;
-        
-        default:
-            [bezelView setBackgroundColor:[self currentValueForThemeAttribute:@"bezel-color"]];
-    }
-    
+
+    [bezelView setBackgroundColor:[self currentValueForThemeAttribute:@"bezel-color"]];
 
     var contentView = [self layoutEphemeralSubviewNamed:@"content-view"
                                              positioned:CPWindowAbove
@@ -697,8 +652,19 @@ CPButtonImageOffset   = 3.0;
 
 - (void)setBezelStyle:(unsigned)aBezelStyle
 {
+    if (aBezelStyle === _bezelStyle)
+        return;
+    
+    var currentState = [CPButtonBezelStyleStateMap objectForKey:_bezelStyle], 
+        newState = [CPButtonBezelStyleStateMap objectForKey:aBezelStyle];
+    
+    if (currentState)
+        [self unsetThemeState:currentState];
+    
+    if (newState)
+        [self setThemeState:newState];
+        
     _bezelStyle = aBezelStyle;
-    [self setNeedsLayout];
 }
 
 - (unsigned)bezelStyle
