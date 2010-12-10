@@ -449,7 +449,7 @@ var themedButtonValues = nil,
             [@"text-shadow-color",  [CPColor colorWithCalibratedWhite:240.0 / 255.0 alpha:1.0], CPThemeStateBordered | CPThemeStateDisabled],
             [@"text-shadow-offset", CGSizeMake(0.0, 1.0), CPThemeStateBordered],
             [@"line-break-mode",    CPLineBreakByTruncatingTail],
-
+            [@"content-inset",      CGInsetMake(0.0, 7.0, 0.0, 7.0), CPThemeStateBordered],
             [@"bezel-color",        bezelColor,                     CPThemeStateBordered],
             [@"bezel-color",        highlightedBezelColor,          CPThemeStateBordered | CPThemeStateHighlighted],
             [@"bezel-color",        disabledBezelColor,             CPThemeStateBordered | CPThemeStateDisabled],
@@ -498,6 +498,16 @@ var themedButtonValues = nil,
 
     [button setTitle:@"OK"];
     [button setThemeState:CPThemeStateDefault];
+
+    return button;
+}
+
++ (CPButton)themedRoundedButton
+{
+    var button = [self button];
+
+    [button setTitle:@"Save"];
+    [button setThemeState:CPButtonStateBezelStyleRounded];
 
     return button;
 }
