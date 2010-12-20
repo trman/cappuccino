@@ -561,17 +561,17 @@ var themedButtonValues = nil,
     var button = [[CPPopUpButton alloc] initWithFrame:CGRectMake(0.0, 0.0, 100.0, 24.0) pullsDown:YES],
         color = PatternColor(
             [
-                ["popup-bezel-left.png", 4.0, 24.0],
+                ["popup-bezel-left.png", 3.0, 24.0],
                 ["popup-bezel-center.png", 1.0, 24.0],
-                ["popup-bezel-right-pullsdown.png", 27.0, 24.0]
+                ["popup-bezel-right-pullsdown.png", 21.0, 24.0]
             ],
             PatternIsHorizontal),
 
         disabledColor = PatternColor(
             [
-                ["popup-bezel-disabled-left.png", 4.0, 24.0],
+                ["popup-bezel-disabled-left.png", 3.0, 24.0],
                 ["popup-bezel-disabled-center.png", 1.0, 24.0],
-                ["popup-bezel-disabled-right-pullsdown.png", 27.0, 24.0]
+                ["popup-bezel-disabled-right-pullsdown.png", 21.0, 24.0]
             ],
             PatternIsHorizontal),
 
@@ -921,21 +921,21 @@ var themedButtonValues = nil,
 
 + (_CPTokenFieldToken)themedTokenFieldToken
 {
-    var token = [[_CPTokenFieldToken alloc] initWithFrame:CGRectMake(0.0, 0.0, 60.0, 18.0)],
+    var token = [[_CPTokenFieldToken alloc] initWithFrame:CGRectMake(0.0, 0.0, 60.0, 19.0)],
 
         bezelColor = PatternColor(
             [
-                ["token-left.png", 11.0, 18.0],
-                ["token-center.png", 1.0, 18.0],
-                ["token-right.png", 11.0, 18.0]
+                ["token-left.png", 11.0, 19.0],
+                ["token-center.png", 1.0, 19.0],
+                ["token-right.png", 11.0, 19.0]
             ],
             PatternIsHorizontal),
 
         bezelHighlightedColor = PatternColor(
             [
-                ["token-highlighted-left.png", 11.0, 18.0],
-                ["token-highlighted-center.png", 1.0, 18.0],
-                ["token-highlighted-right.png", 11.0, 18.0]
+                ["token-highlighted-left.png", 11.0, 19.0],
+                ["token-highlighted-center.png", 1.0, 19.0],
+                ["token-highlighted-right.png", 11.0, 19.0]
             ],
             PatternIsHorizontal),
 
@@ -951,11 +951,11 @@ var themedButtonValues = nil,
             [@"text-color",     textHighlightedColor,               CPThemeStateHighlighted],
 
             [@"bezel-inset",    CGInsetMake(0.0, 0.0, 0.0, 0.0),    CPThemeStateBezeled],
-            [@"content-inset",  CGInsetMake(2.0, 24.0, 2.0, 16.0),  CPThemeStateBezeled],
+            [@"content-inset",  CGInsetMake(1.0, 24.0, 2.0, 16.0),  CPThemeStateBezeled],
 
             // Minimum height == maximum height since tokens are fixed height.
-            [@"min-size",       CGSizeMake(0.0, 18.0)],
-            [@"max-size",       CGSizeMake(-1.0, 18.0)],
+            [@"min-size",       CGSizeMake(0.0, 19.0)],
+            [@"max-size",       CGSizeMake(-1.0, 19.0)],
 
             [@"vertical-alignment", CPCenterTextAlignment],
         ];
