@@ -550,9 +550,12 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     [self setNeedsLayout];
     [_headerView setNeedsDisplay:YES];
     [_headerView setNeedsLayout];
+
+    // height above the rows will change
+    [self noteHeightOfRowsWithIndexesChanged:[CPIndexSet  indexSetWithIndexesInRange:CPMakeRange(0,[self numberOfRows])]];
 }
 
-- (void)setThemeState:(int)astae
+- (void)setThemeState:(int)aState
 {
 }
 
@@ -1149,7 +1152,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         _numberOfRows = [_dataSource numberOfRowsInTableView:self];
     else
     {
-        CPLog(@"no content binding established and data source " + [_dataSource description] + " does not implement numberOfRowsInTableView:");
+        if (_dataSource)
+            CPLog(@"no content binding established and data source " + [_dataSource description] + " does not implement numberOfRowsInTableView:");
         _numberOfRows = 0;
     }
 
@@ -1311,7 +1315,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     return _CGRectMake(range.location, 0.0, range.length, _CGRectGetHeight([self bounds]));
 }
 
-
+// Complexity:
+// O(1)
 /*!
     @ignore
     Returns a CGRect with the location and size of the row
@@ -1320,13 +1325,24 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 */
 - (CGRect)_rectOfRow:(CPInteger)aRowIndex checkRange:(BOOL)checkRange
 {
-    if (checkRange && (aRowIndex > [self numberOfRows] - 1 || aRowIndex < 0))
+    var lastIndex = [self numberOfRows] - 1;
+
+    if (checkRange && (aRowIndex > lastIndex || aRowIndex < 0))
         return _CGRectMakeZero();
 
     if (_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_)
     {
-        var y = _cachedRowHeights[aRowIndex].heightAboveRow,
-            height = _cachedRowHeights[aRowIndex].height + _intercellSpacing.height;
+        var rowToLookUp = MIN(aRowIndex, lastIndex),
+            y = _cachedRowHeights[rowToLookUp].heightAboveRow,
+            height = _cachedRowHeights[rowToLookUp].height + _intercellSpacing.height,
+            rowDelta = aRowIndex - rowToLookUp;
+
+        // if we need the rect of a row past the last index
+        if (rowDelta > 0)
+        {
+            y += rowDelta * (_rowHeight + _intercellSpacing.height);
+            height = _rowHeight + _intercellSpacing.height;
+        }
     }
     else
     {
@@ -1337,8 +1353,6 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     return _CGRectMake(0.0, y, _CGRectGetWidth([self bounds]), height);
 }
 
-// Complexity:
-// O(1)
 /*!
     Returns a CGRect with the location and size of the row
     @param aRowIndex the index of the row you want the rect of
@@ -1379,6 +1393,29 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         lastRow = _numberOfRows - 1;
 
     return CPMakeRange(firstRow, lastRow - firstRow + 1);
+}
+
+/*!
+    @ignore  
+    when we draw the row backgrounds we dont want an index bounding our range
+*/
+- (CPRange)_unboundedRowsInRect:(CGRect)aRect
+{
+    var boundedRange = [self rowsInRect:aRect],
+        lastRow = CPMaxRange(boundedRange),
+        rectOfLastRow = [self _rectOfRow:lastRow checkRange:NO],
+        bottom = _CGRectGetMaxY(aRect),
+        bottomOfBoundedRows = _CGRectGetMaxY(rectOfLastRow);
+
+    // we only have to worry about the rows below the last...
+    if (bottom <= bottomOfBoundedRows)
+        return boundedRange;
+
+    var numberOfNewRows = CEIL(bottom -  bottomOfBoundedRows) / ([self rowHeight] + _intercellSpacing.height);
+
+    boundedRange.length += numberOfNewRows + 1;
+
+    return boundedRange;
 }
 
 // Complexity:
@@ -1472,7 +1509,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                           if (aPoint.y < upperBound)
                               return CPOrderedAscending;
 
-                          if (aPoint.y > upperBound + rowCache.height)
+                          if (aPoint.y > upperBound + rowCache.height + _intercellSpacing.height)
                               return CPOrderedDescending;
 
                           return CPOrderedSame;
@@ -1745,13 +1782,6 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         if ([anIndexSet containsIndex:i])
             var height = [_delegate tableView:self heightOfRow:i];
 
-        if (_cachedRowHeights.length > i)
-        {
-            // since it exists, update it
-            _cachedRowHeights[i].height = height;
-            _cachedRowHeights[i].heightAboveRow = heightAbove;
-        }
-        else
             _cachedRowHeights[i] = {"height":height, "heightAboveRow":heightAbove};
 
         heightAbove += height + _intercellSpacing.height;
@@ -1869,12 +1899,11 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     for (var i = 0; i < [columns count]; i++)
     {
-        var column = [columns objectAtIndex:i];
-
-        var metaData = [CPDictionary dictionaryWithJSObject:{
+        var column = [columns objectAtIndex:i],
+            metaData = [CPDictionary dictionaryWithJSObject:{
             @"identifier": [column identifier],
             @"width": [column width]
-        }];
+            }];
 
         [columnsSetup addObject:metaData];
     }
@@ -2793,7 +2822,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         return;
     }
 
-    var exposedRows = [self rowsInRect:aRect],
+    var exposedRows = [self _unboundedRowsInRect:aRect],
         lastRow = CPMaxRange(exposedRows),
         colorIndex = 0,
         groupRowRects = [],
@@ -2803,13 +2832,13 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     while (colorIndex < colorCount)
     {
         CGContextBeginPath(context);
-        for (var row = colorIndex; row < lastRow; row += colorCount)
+        for (var row = colorIndex; row <= lastRow; row += colorCount)
         {
             // if it's not a group row draw it otherwise we draw it later
             if (![_groupRows containsIndex:row])
-                CGContextAddRect(context, CGRectIntersection(aRect, [self rectOfRow:row]));
+                CGContextAddRect(context, CGRectIntersection(aRect, [self _rectOfRow:row checkRange:NO]));
             else
-                groupRowRects.push(CGRectIntersection(aRect, [self rectOfRow:row]));
+                groupRowRects.push(CGRectIntersection(aRect, [self _rectOfRow:row checkRange:NO]));
         }
         CGContextClosePath(context);
 
@@ -2834,7 +2863,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     if (gridStyleMask & CPTableViewSolidHorizontalGridLineMask)
     {
-        var exposedRows = [self rowsInRect:aRect],
+        var exposedRows = [self _unboundedRowsInRect:aRect],
             row = exposedRows.location,
             lastRow = CPMaxRange(exposedRows) - 1,
             rowY = -0.5,
@@ -2844,7 +2873,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         for (; row <= lastRow; ++row)
         {
             // grab each row rect and add the top and bottom lines
-            var rowRect = [self rectOfRow:row],
+            var rowRect = [self _rectOfRow:row checkRange:NO],
                 rowY = _CGRectGetMaxY(rowRect) - 0.5;
 
             CGContextMoveToPoint(context, minX, rowY);
@@ -3009,7 +3038,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     CGContextBeginPath(context);
     var gridStyleMask = [self gridStyleMask];
-    for(var i = 0; i < count2; i++)
+    for (var i = 0; i < count2; i++)
     {
          var rect = objj_msgSend(self, rectSelector, indexes[i]),
              minX = _CGRectGetMinX(rect) - 0.5,
@@ -3066,37 +3095,37 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
                                                                                             199.0 / 255.0, 199.0 / 255.0, 199.0 / 255.0,1.0], [0,1], 2),
         drawGradient = YES;
 
-        while (i--)
+    while (i--)
+    {
+        var rowRect = rects[i];
+
+        CGContextAddRect(context, rowRect);
+
+        if (drawGradient)
         {
-            var rowRect = rects[i];
+            var minX = CGRectGetMinX(rowRect),
+                minY = CGRectGetMinY(rowRect),
+                maxX = CGRectGetMaxX(rowRect),
+                maxY = CGRectGetMaxY(rowRect);
 
-            CGContextAddRect(context, rowRect);
+            CGContextDrawLinearGradient(context, gradientColor, rowRect.origin, CGPointMake(minX, maxY), 0);
+            CGContextClosePath(context);
 
-            if (drawGradient)
-            {
-                var minX = CGRectGetMinX(rowRect),
-                    minY = CGRectGetMinY(rowRect),
-                    maxX = CGRectGetMaxX(rowRect),
-                    maxY = CGRectGetMaxY(rowRect);
+            CGContextBeginPath(context);
+            CGContextMoveToPoint(context, minX, minY);
+            CGContextAddLineToPoint(context, maxX, minY);
+            CGContextClosePath(context);
+            CGContextSetStrokeColor(context, topLineColor);
+            CGContextStrokePath(context);
 
-                CGContextDrawLinearGradient(context, gradientColor, rowRect.origin, CGPointMake(minX, maxY), 0);
-                CGContextClosePath(context);
-
-                CGContextBeginPath(context);
-                CGContextMoveToPoint(context, minX, minY);
-                CGContextAddLineToPoint(context, maxX, minY);
-                CGContextClosePath(context);
-                CGContextSetStrokeColor(context, topLineColor);
-                CGContextStrokePath(context);
-
-                CGContextBeginPath(context);
-                CGContextMoveToPoint(context, minX, maxY);
-                CGContextAddLineToPoint(context, maxX, maxY - 1);
-                CGContextClosePath(context);
-                CGContextSetStrokeColor(context, bottomLineColor);
-                CGContextStrokePath(context);
-            }
+            CGContextBeginPath(context);
+            CGContextMoveToPoint(context, minX, maxY);
+            CGContextAddLineToPoint(context, maxX, maxY - 1);
+            CGContextClosePath(context);
+            CGContextSetStrokeColor(context, bottomLineColor);
+            CGContextStrokePath(context);
         }
+    }
 
     CGContextClosePath(context);
 }
@@ -3993,18 +4022,22 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
 
 - (void)removeMatches:(CPIndexSet)otherSet
 {
-    var firstindex = [self firstIndex];
-    var index = MIN(firstindex, [otherSet firstIndex]);
-    var switchFlag = (index == firstindex);
+    var firstindex = [self firstIndex],
+        index = MIN(firstindex, [otherSet firstIndex]),
+        switchFlag = (index == firstindex);
+
     while (index != CPNotFound)
     {
         var indexSet = (switchFlag) ? otherSet : self;
+
         otherIndex = [indexSet indexGreaterThanOrEqualToIndex:index];
+
         if (otherIndex == index)
         {
             [self removeIndex:index];
             [otherSet removeIndex:index];
         }
+
         index = otherIndex;
         switchFlag = !switchFlag;
     }
