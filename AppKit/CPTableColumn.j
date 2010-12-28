@@ -108,11 +108,32 @@ CPTableColumnUserResizingMask   = 1 << 1;
 }
 
 /*!
-    Return the column's parent dataview
+    Return the column's parent tableview
 */
 - (CPTableView)tableView
 {
     return _tableView;
+}
+
+/*!
+    @ignore
+    this method tries to resize a column called via the tableview via autoresizing
+    it returns the delta from the actual resize and the proposed resize
+
+    for example if the column should have been resized 50px but the maxWidth was hit only
+    after 25px then the return value would be 25px;
+
+    if no edge has been hit zero will be returned
+*/
+- (int)_tryToResizeToWidth:(int)width
+{
+    var min = [self minWidth],
+        max = [self maxWidth],
+        newWidth = MIN(MAX(width, min), max);
+
+    [self setWidth:newWidth];
+
+    return newWidth - width;
 }
 
 /*!
@@ -171,7 +192,7 @@ CPTableColumnUserResizingMask   = 1 << 1;
 }
 
 /*!
-    Sets the mininum width of the column. 
+    Sets the minimum width of the column. 
     Default value is 10.
 */
 - (void)setMinWidth:(float)aMinWidth
