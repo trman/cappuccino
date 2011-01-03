@@ -1372,7 +1372,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 - (void)editColumn:(CPInteger)columnIndex row:(CPInteger)rowIndex withEvent:(CPEvent)theEvent select:(BOOL)flag
 {
     // FIX ME: Cocoa documenation says all this should be called in THIS method:
-    // sets up the field editor, and sends selectWithFrame:inView:editor:delegate:start:length: and editWithFrame:inView:editor:delegate:event: to the field editorÕs NSCell object with the NSTableView as the text delegate.
+    // sets up the field editor, and sends selectWithFrame:inView:editor:delegate:start:length: and editWithFrame:inView:editor:delegate:event: to the field editor's NSCell object with the NSTableView as the text delegate.
 
     if (![self isRowSelected:rowIndex])
         [[CPException exceptionWithName:@"Error" reason:@"Attempt to edit row="+rowIndex+" when not selected." userInfo:nil] raise];
@@ -1809,7 +1809,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         // Fix me: this fires on the table setup at times
         if (lastColumnMaxX >= superviewWidth && lastColumnMaxX <= aSize.width || lastColumnMaxX <= superviewWidth && lastColumnMaxX >= aSize.width)
             _lastColumnShouldSnap = YES;
-        else
+        else if (mask === CPTableViewUniformColumnAutoresizingStyle)
             return;
     }
 
@@ -1964,10 +1964,10 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 
     var count = NUMBER_OF_COLUMNS();
 
-    //decrement the counter until we get to the last row that's not hidden
-    while (count-- && [_tableColumns[count] isHidden]) ;
+    // Decrement the counter until we get to the last column that's not hidden
+    while (count-- && [_tableColumns[count] isHidden]);
 
-    //if the last column exists
+    // If the last column exists
     if (count >= 0)
     {
         var columnToResize = _tableColumns[count],
@@ -3063,9 +3063,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
             [dataView setFrame:[self frameOfDataViewAtColumn:column row:row]];
             [dataView setObjectValue:[self _objectValueForTableColumn:tableColumn row:row]];
 
-            //This gives the table column an opportunity to apply the bindings.
-            //It will override the value set in the data source, if there is a data source.
-            //It will do nothing if there is no value binding set.
+            // This gives the table column an opportunity to apply its bindings.
+            // It will override the value set above if there is a binding.
             [tableColumn prepareDataView:dataView forRow:row];
 
             if (isColumnSelected || [self isRowSelected:row])
@@ -3162,10 +3161,19 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 /*!
     @ignore
     The action for any dataview that supports editing. This will only be called when the value was changed.
+    The table view becomes the first responder after user is done editing a dataview.
 */
 - (void)_commitDataViewObjectValue:(id)sender
 {
     [_dataSource tableView:self setObjectValue:[sender objectValue] forTableColumn:sender.tableViewEditedColumnObj row:sender.tableViewEditedRowIndex];
+
+    if ([sender respondsToSelector:@selector(setEditable:)])
+        [sender setEditable:NO];
+
+    if ([sender respondsToSelector:@selector(setSelectable:)])
+        [sender setSelectable:NO];
+
+    [[self window] makeFirstResponder:self];
 }
 
 /*!
@@ -4391,7 +4399,7 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         if ([selectedIndexes containsIndex:i])
         {
             i = shouldGoUpward ? [selectedIndexes firstIndex] -1 : [selectedIndexes lastIndex] + 1;
-            i = MIN(MAX(i,0), [self numberOfRows]-1);
+            i = MIN(MAX(i,0), [self numberOfRows] - 1);
         }
 
         [selectedIndexes addIndex:i];
@@ -4624,7 +4632,7 @@ var CPTableViewDataSourceKey                = @"CPTableViewDataSourceKey",
         }
         else
         {
-            CGContextSetFillColor(context, [CPColor colorWithRed:72/255 green:134/255 blue:202/255 alpha:0.25]);
+            CGContextSetFillColor(context, [CPColor colorWithRed:72 / 255 green:134 / 255 blue:202 / 255 alpha:0.25]);
             CGContextFillRoundedRectangleInRect(context, newRect, 8, YES, YES, YES, YES);
         }
         CGContextStrokeRoundedRectangleInRect(context, newRect, 8, YES, YES, YES, YES);
