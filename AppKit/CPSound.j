@@ -67,7 +67,7 @@ CPSoundPlayBackStatePause   = 2;
         _audioTag.onended = function()
         {
             [self _soundDidEnd];
-        });
+        }
     }
 
     return self;
