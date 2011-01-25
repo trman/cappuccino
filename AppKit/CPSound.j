@@ -60,11 +60,11 @@ CPSoundPlayBackStatePause   = 2;
         _loops = NO;
         _audioTag = document.createElement("audio");
         _audioTag.preload = YES;
-        _audioTag.addEventListener("canplay", function()
+        _audioTag.oncanplay = function()
         {
             [self _soundDidload];
-        });
-        _audioTag.addEventListener("ended", function()
+        }
+        _audioTag.onended = function()
         {
             [self _soundDidEnd];
         });
