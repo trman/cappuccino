@@ -75,15 +75,20 @@ var CPOutlineViewDelegate_outlineView_dataViewForTableColumn_item_              
 
 CPOutlineViewDropOnItemIndex = -1;
 
+var CPOutlineViewCoalesceSelectionNotificationStateOff  = 0,
+    CPOutlineViewCoalesceSelectionNotificationStateOn   = 1,
+    CPOutlineViewCoalesceSelectionNotificationStateDid  = 2;
+
 /*!
     @ingroup appkit
     @class CPOutlineView
 
-    CPOutlineView is a subclass of CPTableView that inherates the row and column format to display hierarchial data. 
+    CPOutlineView is a subclass of CPTableView that inherates the row and column format to display hierarchial data.
     The outlineview adds the ability to expand and collapse items. This is useful for browsing a tree like structure such as directories or a filesystem.
 
     Like the tableview, an outlineview uses a data source to supply its data. For this reason you must implement a couple data source methods (documented in setDataSource:)
-    
+
+    Theme states for custom data views are documented in CPTableView
 */
 @implementation CPOutlineView : CPTableView
 {
@@ -113,6 +118,8 @@ CPOutlineViewDropOnItemIndex = -1;
     CPInteger       _retargedChildIndex;
     CPTimer         _dragHoverTimer;
     id              _dropItem;
+
+    BOOL            _coalesceSelectionNotificationState;
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -121,7 +128,6 @@ CPOutlineViewDropOnItemIndex = -1;
 
     if (self)
     {
-
         _selectionHighlightStyle = CPTableViewSelectionHighlightStyleSourceList;
 
         // The root item has weight "0", thus represents the weight solely of its descendants.
@@ -150,8 +156,9 @@ CPOutlineViewDropOnItemIndex = -1;
     return self;
 }
 /*!
+<pre>
     In addition to standard delegation, the outline view also supports data source delegation. This method sets the data source object.
-    Just like the TableView you have CPTableColumns but instead of rows you deal with items. 
+    Just like the TableView you have CPTableColumns but instead of rows you deal with items.
 
     You must implement these data source methods:
 
@@ -165,7 +172,7 @@ CPOutlineViewDropOnItemIndex = -1;
         Returns the number of child items of a given item. If item is nil you should return the number of top level (root) items.
 
     - (id)outlineView:(CPOutlineView)outlineView objectValueForTableColumn:(CPTableColumn)tableColumn byItem:(id)item;
-        Returns the object value of the item in a given column. 
+        Returns the object value of the item in a given column.
 
 
     The following methods are optional:
@@ -195,7 +202,7 @@ CPOutlineViewDropOnItemIndex = -1;
         Returns YES if the drop operation is allowed otherwise NO.
         This method is invoked by the outlineview after a drag should begin, but before it is started. If you dont want the drag to being return NO.
         If you want the drag to begin you should return YES and place the drag data on the pboard.
-    
+</pre>
 */
 - (void)setDataSource:(id)aDataSource
 {
@@ -280,11 +287,11 @@ CPOutlineViewDropOnItemIndex = -1;
 }
 
 /*!
-   Used to find if an item is already expanded. 
+   Used to find if an item is already expanded.
 
     @param anItem - the item you are interest in.
 
-    @return BOOL - Yes if the item is already expanded, otherwise NO. 
+    @return BOOL - Yes if the item is already expanded, otherwise NO.
 */
 - (BOOL)isItemExpanded:(id)anItem
 {
@@ -327,13 +334,42 @@ CPOutlineViewDropOnItemIndex = -1;
     if (!itemInfo)
         return;
 
+    // When shouldExpandChildren is YES, we need to make sure we're collecting
+    // selection notifications so that exactly one IsChanging and one DidChange
+    // is sent as needed, for the totallity of the operation.
+    var isTopLevel = NO;
+    if (!_coalesceSelectionNotificationState)
+    {
+        isTopLevel = YES;
+        _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateOn;
+    }
+
     // to prevent items which are already expanded from firing notifications
     if (!itemInfo.isExpanded)
     {
         [self _noteItemWillExpand:anItem];
+
+        var previousRowCount = [self numberOfRows];
+
         itemInfo.isExpanded = YES;
+        // XXX Shouldn't the items reload before the notification is sent?
         [self _noteItemDidExpand:anItem];
         [self reloadItem:anItem reloadChildren:YES];
+
+        // Shift selection indexes below so that the same items remain selected.
+        var rowCountDelta = [self numberOfRows] - previousRowCount;
+        if (rowCountDelta)
+        {
+            var selection = [self selectedRowIndexes],
+                expandIndex = [self rowForItem:anItem] + 1;
+
+            if ([selection intersectsIndexesInRange:CPMakeRange(expandIndex, _itemsForRows.length)])
+            {
+                [self _noteSelectionIsChanging];
+                [selection shiftIndexesStartingAtIndex:expandIndex by:rowCountDelta];
+                [self _setSelectedRowIndexes:selection]; // _noteSelectionDidChange will be suppressed.
+            }
+        }
     }
 
     if (shouldExpandChildren)
@@ -343,6 +379,14 @@ CPOutlineViewDropOnItemIndex = -1;
 
         while (childIndex--)
             [self expandItem:children[childIndex] expandChildren:YES];
+    }
+
+    if (isTopLevel)
+    {
+        var r = _coalesceSelectionNotificationState;
+        _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateOff;
+        if (r === CPOutlineViewCoalesceSelectionNotificationStateDid)
+            [self _noteSelectionDidChange];
     }
 }
 
@@ -364,11 +408,53 @@ CPOutlineViewDropOnItemIndex = -1;
     if (!itemInfo.isExpanded)
         return;
 
-    [self _noteItemWillCollapse:anItem];
-    itemInfo.isExpanded = NO;
-    [self _noteItemDidCollapse:anItem];
+    // Don't spam notifications.
+    _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateOn;
 
+    [self _noteItemWillCollapse:anItem];
+    // Update selections:
+    // * Deselect items inside the collapsed item.
+    // * Shift row selections below the collapsed item so that the same logical items remain selected.
+    var collapseTopIndex = [self rowForItem:anItem],
+        topLevel = [self levelForRow:collapseTopIndex],
+        collapseEndIndex = collapseTopIndex;
+
+    while (collapseEndIndex + 1 < _itemsForRows.length && [self levelForRow:collapseEndIndex + 1] > topLevel)
+        collapseEndIndex++;
+
+    var collapseRange = CPMakeRange(collapseTopIndex + 1, collapseEndIndex - collapseTopIndex);
+
+    if (collapseRange.length)
+    {
+        var selection = [self selectedRowIndexes];
+
+        if ([selection intersectsIndexesInRange:collapseRange])
+        {
+            [self _noteSelectionIsChanging];
+            [selection removeIndexesInRange:collapseRange];
+            [self _setSelectedRowIndexes:selection]; // _noteSelectionDidChange will be suppressed.
+        }
+
+        // Shift any selected rows below upwards.
+        if ([selection intersectsIndexesInRange:CPMakeRange(collapseEndIndex + 1, _itemsForRows.length)])
+        {
+            [self _noteSelectionIsChanging];
+            [selection shiftIndexesStartingAtIndex:collapseEndIndex + 1 by:-collapseRange.length];
+            [self _setSelectedRowIndexes:selection]; // _noteSelectionDidChange will be suppressed.
+        }
+    }
+    itemInfo.isExpanded = NO;
+
+    // XXX Shouldn't the items reload before the notification is sent?
+    [self _noteItemDidCollapse:anItem];
     [self reloadItem:anItem reloadChildren:YES];
+
+    // Send selection notifications only after the items have loaded so that
+    // the new selection is consistent with the actual rows for any observers.
+    var r = _coalesceSelectionNotificationState;
+    _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateOff;
+    if (r === CPOutlineViewCoalesceSelectionNotificationStateDid)
+        [self _noteSelectionDidChange];
 }
 
 /*!
@@ -429,7 +515,7 @@ CPOutlineViewDropOnItemIndex = -1;
 
 /*!
     Sets the table column you want to display the disclosure button in.
-
+    If you do not want an outline column pass nil. 
     @param aTableColumn - The CPTableColumn you want to use for hierarchical data.
 */
 - (void)setOutlineTableColumn:(CPTableColumn)aTableColumn
@@ -500,7 +586,7 @@ CPOutlineViewDropOnItemIndex = -1;
 }
 
 /*!
-    Returns the width of an indentation level. 
+    Returns the width of an indentation level.
 
     @return float - the width of the indentation per level.
 */
@@ -580,14 +666,14 @@ CPOutlineViewDropOnItemIndex = -1;
 /*!
     Returns the frame of the disclosure button for the outline column.
     If the item is not expandable a CGZeroRect is returned.
-    Subclasses can return a CGZeroRect to prevent the disclosure control from being displayed. 
+    Subclasses can return a CGZeroRect to prevent the disclosure control from being displayed.
 
     @param aRow - The row of the reciever
     @return CGRect - The rect of the disclosure button at aRow.
 */
 - (CGRect)frameOfOutlineDisclosureControlAtRow:(CPInteger)aRow
 {
-    if (![self isExpandable:[self itemAtRow:aRow]]) 
+    if (![self isExpandable:[self itemAtRow:aRow]])
         return _CGRectMakeZero();
 
     var dataViewFrame = [self _frameOfOutlineDataViewAtRow:aRow],
@@ -611,6 +697,7 @@ CPOutlineViewDropOnItemIndex = -1;
 }
 
 /*!
+<pre>
     Sets the delegate for the outlineview.
 
     The following methods can be implemented:
@@ -670,7 +757,14 @@ CPOutlineViewDropOnItemIndex = -1;
         Implement this to indicate whether a given item should be rendered using the group item style.
         Return YES if the item is a group item, otherwise NO.
 
-    @param aDelegate - the delegate object you wish to set for the reciever. 
+    Variable Item Heights
+    - (int)outlineView:(CPOutlineView)outlineView heightOfRowByItem:(id)anItem;
+        Implement this method to get custom heights of rows based on the item.
+        This delegate method will be passed your 'item' object and expects you to return an integer height.
+        NOTE: this should only be implemented if rows will be different heights, if you want to set a height for ALL of your rows see -setRowHeight:
+
+    @param aDelegate - the delegate object you wish to set for the reciever.
+<pre>
 */
 - (void)setDelegate:(id)aDelegate
 {
@@ -867,6 +961,29 @@ CPOutlineViewDropOnItemIndex = -1;
 }
 
 /*!
+    Adds a new table column to the reciever. If this is the first column added it will automatically be set to the outline column.
+    Also see -setOutlineTableColumn:
+    NOTE: This behavior deviates from cocoa slightly.
+    @param CPTableColumn aTableColumn - The table column to add.
+*/
+- (void)addTableColumn:(CPTableColumn)aTableColumn
+{
+    [super addTableColumn:aTableColumn];
+
+    if ([self numberOfColumns] === 1)
+        _outlineTableColumn = aTableColumn;
+}
+/*!
+    @ignore
+*/
+- (void)removeTableColumn:(CPTableColumn)aTableColumn
+{
+    if (aTableColumn === [self outlineTableColumn])
+        CPLog("CPOutlineView cannot remove outlineTableColumn with removeTableColumn:. User setOutlineTableColumn: instead.");
+    else
+        [super removeTableColumn:aTableColumn];
+}
+/*!
     @ignore
     We overide this because we need a special behaviour for the outline column
 */
@@ -944,7 +1061,7 @@ CPOutlineViewDropOnItemIndex = -1;
     Retargets the drop item for the outlineview.
     To specify a drop on theItem, you specify item as theItem and index as CPOutlineViewDropOnItemIndex.
     To specify a drop between child 1 and 2 of theItem, you specify item as theItem and index as 2.
-    To specify a drop on an item that can’t be expanded theItem, you specify item as someOutlineItem and index as CPOutlineViewDropOnItemIndex.
+    To specify a drop on an item that can't be expanded theItem, you specify item as someOutlineItem and index as CPOutlineViewDropOnItemIndex.
 
     @param theItem - The item you want to retarget the drop on.
     @param theIndex - The index of the child item you want to retarget the drop between. Pass CPOutlineViewDropOnItemIndex if you want to drop on theItem.
@@ -1221,10 +1338,16 @@ CPOutlineViewDropOnItemIndex = -1;
 */
 - (void)_noteSelectionIsChanging
 {
-    [[CPNotificationCenter defaultCenter]
-        postNotificationName:CPOutlineViewSelectionIsChangingNotification
-                      object:self
-                    userInfo:nil];
+    if (!_coalesceSelectionNotificationState || _coalesceSelectionNotificationState === CPOutlineViewCoalesceSelectionNotificationStateOn)
+    {
+        [[CPNotificationCenter defaultCenter]
+            postNotificationName:CPOutlineViewSelectionIsChangingNotification
+                          object:self
+                        userInfo:nil];
+    }
+
+    if (_coalesceSelectionNotificationState === CPOutlineViewCoalesceSelectionNotificationStateOn)
+        _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateDid;
 }
 
 /*!
@@ -1232,10 +1355,16 @@ CPOutlineViewDropOnItemIndex = -1;
 */
 - (void)_noteSelectionDidChange
 {
-    [[CPNotificationCenter defaultCenter]
-        postNotificationName:CPOutlineViewSelectionDidChangeNotification
-                      object:self
-                    userInfo:nil];
+    if (!_coalesceSelectionNotificationState)
+    {
+        [[CPNotificationCenter defaultCenter]
+            postNotificationName:CPOutlineViewSelectionDidChangeNotification
+                          object:self
+                        userInfo:nil];
+    }
+
+    if (_coalesceSelectionNotificationState === CPOutlineViewCoalesceSelectionNotificationStateOn)
+        _coalesceSelectionNotificationState = CPOutlineViewCoalesceSelectionNotificationStateDid;
 }
 
 /*!
@@ -1595,13 +1724,13 @@ var _loadItemInfoForItem = function(/*CPOutlineView*/ anOutlineView, /*id*/ anIt
     return NO;
 }
 
-/*- (float)tableView:(CPTableView)theTableView heightOfRow:(int)theRow
+- (float)tableView:(CPTableView)theTableView heightOfRow:(int)theRow
 {
     if ((_outlineView._implementedOutlineViewDelegateMethods & CPOutlineViewDelegate_outlineView_heightOfRowByItem_))
         return [_outlineView._outlineViewDelegate outlineView:_outlineView heightOfRowByItem:[_outlineView itemAtRow:theRow]];
 
     return [theTableView rowHeight];
-}*/
+}
 
 - (void)tableView:(CPTableView)aTableView willDisplayView:(id)aView forTableColumn:(CPTableColumn)aTableColumn row:(int)aRowIndex
 {
@@ -1731,7 +1860,14 @@ var CPOutlineViewIndentationPerLevelKey = @"CPOutlineViewIndentationPerLevelKey"
 
 - (void)encodeWithCoder:(CPCoder)aCoder
 {
+    // Make sure we don't encode our internal delegate and data source.
+    var internalDelegate = _delegate,
+        internalDataSource = _dataSource;
+    _delegate = nil;
+    _dataSource = nil;
     [super encodeWithCoder:aCoder];
+    _delegate = internalDelegate;
+    _dataSource = internalDataSource;
 
     [aCoder encodeObject:_outlineTableColumn forKey:CPOutlineViewOutlineTableColumnKey];
     [aCoder encodeFloat:_indentationPerLevel forKey:CPOutlineViewIndentationPerLevelKey];

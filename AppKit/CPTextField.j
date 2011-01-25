@@ -84,7 +84,6 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
     CPColor                 _textFieldBackgroundColor;
 
     id                      _placeholderString;
-    id                      _originalPlaceholderString;
     BOOL                    _currentValueIsPlaceholder;
 
     id                      _delegate;
@@ -158,6 +157,14 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 + (CPString)defaultThemeClass
 {
     return "textfield";
+}
+
++ (Class)_binderClassForBinding:(CPString)theBinding
+{
+    if (theBinding === CPValueBinding)
+        return [_CPTextFieldValueBinder class];
+
+    return [super _binderClassForBinding:theBinding];
 }
 
 + (id)themeAttributes
@@ -479,11 +486,15 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 #if PLATFORM(DOM)
 
     var string = [self stringValue],
-        element = [self _inputElement];
+        element = [self _inputElement],
+        font = [self currentValueForThemeAttribute:@"font"];
+
+    // generate the font metric
+    [font _getMetrics];
 
     element.value = string;
     element.style.color = [[self currentValueForThemeAttribute:@"text-color"] cssString];
-    element.style.font = [[self currentValueForThemeAttribute:@"font"] cssString];
+    element.style.font = [font cssString];
     element.style.zIndex = 1000;
 
     switch ([self alignment])
@@ -495,12 +506,32 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
         default:                    element.style.textAlign = "left";
     }
 
-    var contentRect = [self contentRectForBounds:[self bounds]];
+    var contentRect = [self contentRectForBounds:[self bounds]],
+        verticalAlign = [self currentValueForThemeAttribute:"vertical-alignment"];
 
-    element.style.top = _CGRectGetMinY(contentRect) + "px";
+    switch(verticalAlign)
+    {
+        case CPTopVerticalTextAlignment:
+            var topPoint = (_CGRectGetMinY(contentRect) + 1) + "px"; // for the same reason we have a -1 for the left, we also have a + 1 here
+            break;
+
+        case CPCenterVerticalTextAlignment:
+            var topPoint = (_CGRectGetMidY(contentRect) - (font._lineHeight / 2) + 1) + "px";
+            break;
+
+        case CPBottomVerticalTextAlignment:
+            var topPoint = (_CGRectGetMaxY(contentRect) - font._lineHeight) + "px";
+            break;
+
+        default:
+            var topPoint = (_CGRectGetMinY(contentRect) + 1) + "px";
+            break;
+    }
+
+    element.style.top = topPoint; 
     element.style.left = (_CGRectGetMinX(contentRect) - 1) + "px"; // why -1?
     element.style.width = _CGRectGetWidth(contentRect) + "px";
-    element.style.height = _CGRectGetHeight(contentRect) + "px";
+    element.style.height = font._lineHeight + "px"; // private ivar for the line height of the DOM text at this particaulr size
 
     _DOMElement.appendChild(element);
 
@@ -672,28 +703,85 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 - (void)keyDown:(CPEvent)anEvent
 {
-    var characters = [anEvent characters];
-    // Treat \r and \n the same. See issue #710.
-    if (characters === CPNewlineCharacter || characters === CPCarriageReturnCharacter)
-    {
-        // selectText: has a side effect - it can change first responder of the window
-        // we have to prevent such behaviour inside this method because target should be able to change first responder after receiving action.
-        [self selectText:nil];
+    if ([anEvent _couldBeKeyEquivalent] && [self performKeyEquivalent:anEvent])
+        return;
 
-        if (_isEditing)
-        {
-            _isEditing = NO;
-            [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
-        }
+    // CPTextField uses an HTML input element to take the input so we need to
+    // propagate the dom event so the element is updated. This has to be done
+    // before interpretKeyEvents: though so individual commands have a chance
+    // to override this (escape to clear the text in a search field for example).
+    [[[self window] platformWindow] _propagateCurrentDOMEvent:YES];
 
-        [self sendAction:[self action] to:[self target]];
-
-        [[[self window] platformWindow] _propagateCurrentDOMEvent:NO];
-    }
-    else
-        [[[self window] platformWindow] _propagateCurrentDOMEvent:YES];
+    [self interpretKeyEvents:[anEvent]];
 
     [[CPRunLoop currentRunLoop] limitDateForMode:CPDefaultRunLoopMode];
+}
+
+/*!
+    Invoke the action specified by aSelector on the current responder.
+    
+    This is implemented by CPResponder and by default it passes any unrecignized 
+    actions on to the next responder but text fields appearently aren't supposed 
+    to do that according to this documentation by Apple:
+    
+    http://developer.apple.com/mac/library/documentation/cocoa/reference/NSTextInputClient_Protocol/Reference/Reference.html#//apple_ref/occ/intfm/NSTextInputClient/doCommandBySelector:
+*/
+- (void)doCommandBySelector:(SEL)aSelector
+{
+    if ([self respondsToSelector:aSelector])
+        [self performSelector:aSelector];
+}
+
+- (void)insertNewline:(id)sender
+{
+    if (_isEditing)
+    {
+        _isEditing = NO;
+        [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
+    }
+
+    [self sendAction:[self action] to:[self target]];
+    [self selectText:nil];
+
+    [[[self window] platformWindow] _propagateCurrentDOMEvent:NO];
+}
+
+- (void)insertNewlineIgnoringFieldEditor:(id)sender
+{
+    var oldValue = [self stringValue];
+
+    [self _inputElement].value += CPNewlineCharacter;
+    [self _setStringValue:[self _inputElement].value];
+
+    if (oldValue !== [self stringValue])
+    {
+        if (!_isEditing)
+        {
+            _isEditing = YES;
+            [self textDidBeginEditing:[CPNotification notificationWithName:CPControlTextDidBeginEditingNotification object:self userInfo:nil]];
+        }
+
+        [self textDidChange:[CPNotification notificationWithName:CPControlTextDidChangeNotification object:self userInfo:nil]];
+    }
+}
+
+- (void)insertTabIgnoringFieldEditor:(id)sender
+{
+    var oldValue = [self stringValue];
+
+    [self _inputElement].value += CPTabCharacter;
+    [self _setStringValue:[self _inputElement].value];
+
+    if (oldValue !== [self stringValue])
+    {
+        if (!_isEditing)
+        {
+            _isEditing = YES;
+            [self textDidBeginEditing:[CPNotification notificationWithName:CPControlTextDidBeginEditingNotification object:self userInfo:nil]];
+        }
+
+        [self textDidChange:[CPNotification notificationWithName:CPControlTextDidChangeNotification object:self userInfo:nil]];
+    }
 }
 
 - (void)textDidBlur:(CPNotification)note
@@ -733,6 +821,7 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 /*
     @ignore
+    Sets the internal string value without updating the value in the input element
 */
 - (void)_setStringValue:(id)aValue
 {
@@ -790,30 +879,6 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 - (CPString)placeholderString
 {
     return _placeholderString;
-}
-
-- (void)_setCurrentValueIsPlaceholder:(BOOL)isPlaceholder
-{
-    if (isPlaceholder)
-    {
-        // Save the original placeholder value so we can restore it later
-        // Only do this if the placeholder is not already overridden because the bindings logic might call this method
-        // several times and we don't want the bindings placeholder to ever become the original placeholder
-        if (!_currentValueIsPlaceholder)
-            _originalPlaceholderString = [self placeholderString];
-
-        // Set the current string value as the current placeholder and clear the string value
-        [self setPlaceholderString:[self stringValue]];
-        [self setStringValue:@""];
-    }
-    else if (_originalPlaceholderString)
-    {
-        // Restore the original placeholder, the actual textfield value is already correct
-        // because it was set using setValue:forKey:
-        [self setPlaceholderString:_originalPlaceholderString];
-    }
-
-    _currentValueIsPlaceholder = isPlaceholder;
 }
 
 /*!
@@ -1270,7 +1335,6 @@ var CPTextFieldIsEditableKey            = "CPTextFieldIsEditableKey",
         [self setAlignment:[aCoder decodeIntForKey:CPTextFieldAlignmentKey]];
 
         [self setPlaceholderString:[aCoder decodeObjectForKey:CPTextFieldPlaceholderStringKey]];
-
     }
 
     return self;
@@ -1295,6 +1359,51 @@ var CPTextFieldIsEditableKey            = "CPTextFieldIsEditableKey",
     [aCoder encodeInt:[self alignment] forKey:CPTextFieldAlignmentKey];
 
     [aCoder encodeObject:_placeholderString forKey:CPTextFieldPlaceholderStringKey];
+}
+
+@end
+
+@implementation _CPTextFieldValueBinder : CPBinder
+{
+}
+
+- (void)setValueFor:(CPString)theBinding
+{
+    var destination = [_info objectForKey:CPObservedObjectKey],
+        keyPath = [_info objectForKey:CPObservedKeyPathKey],
+        options = [_info objectForKey:CPOptionsKey],
+        newValue = [destination valueForKeyPath:keyPath],
+        isPlaceholder = CPIsControllerMarker(newValue);
+
+    if (isPlaceholder)
+    {
+        switch (newValue)
+        {
+            case CPMultipleValuesMarker:
+                newValue = [options objectForKey:CPMultipleValuesPlaceholderBindingOption] || @"Multiple Values";
+                break;
+
+            case CPNoSelectionMarker:
+                newValue = [options objectForKey:CPNoSelectionPlaceholderBindingOption] || @"No Selection";
+                break;
+
+            case CPNotApplicableMarker:
+                if ([options objectForKey:CPRaisesForNotApplicableKeysBindingOption])
+                    [CPException raise:CPGenericException
+                                reason:@"can't transform non applicable key on: "+_source+" value: "+newValue];
+
+                newValue = [options objectForKey:CPNotApplicablePlaceholderBindingOption] || @"Not Applicable";
+                break;
+        }
+
+        [_source setPlaceholderString:newValue];
+        [_source setObjectValue:nil];
+    }
+    else
+    {
+        newValue = [self transformValue:newValue withOptions:options];
+        [_source setObjectValue:newValue];
+    }
 }
 
 @end

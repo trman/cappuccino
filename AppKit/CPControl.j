@@ -141,18 +141,20 @@ var CPControlBlackColor     = [CPColor blackColor];
     }
 }
 
-- (void)_reverseSetBinding
++ (Class)_binderClassForBinding:(CPString)theBinding
 {
-    var theBinding = [CPKeyValueBinding getBinding:CPValueBinding forObject:self];
-    [theBinding reverseSetValueFor:@"objectValue"];
+    if (theBinding === CPValueBinding)
+        return [_CPValueBinder class];
+
+    return [super _binderClassForBinding:theBinding];
 }
 
-- (void)_replacementKeyPathForBinding:(CPString)aBinding
+- (void)_reverseSetBinding
 {
-    if (aBinding === @"value")
-        return @"objectValue";
+    var binderClass = [[self class] _binderClassForBinding:CPValueBinding],
+        theBinding = [binderClass getBinding:CPValueBinding forObject:self];
 
-    return [super _replacementKeyPathForBinding:aBinding];
+    [theBinding reverseSetValueFor:@"objectValue"];
 }
 
 - (id)initWithFrame:(CGRect)aFrame
@@ -751,8 +753,10 @@ var __Deprecated__CPImageViewImageKey   = @"CPImageViewImageKey";
     if (_sendsActionOnEndEditing)
         [aCoder encodeBool:_sendsActionOnEndEditing forKey:CPControlSendsActionOnEndEditingKey];
 
-    if (_value !== nil)
-        [aCoder encodeObject:_value forKey:CPControlValueKey];
+    var objectValue = [self objectValue];
+
+    if (objectValue !== nil)
+        [aCoder encodeObject:objectValue forKey:CPControlValueKey];
 
     if (_target !== nil)
         [aCoder encodeConditionalObject:_target forKey:CPControlTargetKey];
