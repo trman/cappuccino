@@ -293,9 +293,8 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
         [self setGridColor:[CPColor colorWithHexString:@"dce0e2"]];
         [self setGridStyleMask:CPTableViewGridNone];
 
-        _headerView = [[CPTableHeaderView alloc] initWithFrame:CGRectMake(0, 0, [self bounds].size.width, _rowHeight)];
-
-        [_headerView setTableView:self];
+        [self setHeaderView:[[CPTableHeaderView alloc] initWithFrame:_CGRectMake(0, 0, [self bounds].size.width, _rowHeight)]];
+        [self setCornerView:[[_CPCornerView alloc] initWithFrame:_CGRectMake(0, 0, [CPScroller scrollerWidth], _CGRectGetHeight([_headerView frame]))]];
 
         _currentHighlightedTableColumn = nil;
 
@@ -1391,7 +1390,7 @@ NOT YET IMPLEMENTED
         _numberOfRows = [[destination valueForKeyPath:keyPath] count];
     }
     else if (_dataSource && (_implementedDataSourceMethods & CPTableViewDataSource_numberOfRowsInTableView_))
-        _numberOfRows = [_dataSource numberOfRowsInTableView:self];
+        _numberOfRows = [_dataSource numberOfRowsInTableView:self] || 0;
     else
     {
         if (_dataSource)
@@ -1598,10 +1597,20 @@ NOT YET IMPLEMENTED
 
     if (_implementedDelegateMethods & CPTableViewDelegate_tableView_heightOfRow_)
     {
-        var rowToLookUp = MIN(aRowIndex, lastIndex),
-            y = _cachedRowHeights[rowToLookUp].heightAboveRow,
-            height = _cachedRowHeights[rowToLookUp].height + _intercellSpacing.height,
-            rowDelta = aRowIndex - rowToLookUp;
+        var rowToLookUp = MIN(aRowIndex, lastIndex);
+
+        // if the row doesn't exist 
+        if (rowToLookUp !== CPNotFound)
+        {
+            var y = _cachedRowHeights[rowToLookUp].heightAboveRow,
+                height = _cachedRowHeights[rowToLookUp].height + _intercellSpacing.height,
+                rowDelta = aRowIndex - rowToLookUp;
+        }
+        else
+        {
+            y = aRowIndex * (_rowHeight + _intercellSpacing.height);
+            height = _rowHeight + _intercellSpacing.height;
+        }
 
         // if we need the rect of a row past the last index
         if (rowDelta > 0)
