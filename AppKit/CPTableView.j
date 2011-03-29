@@ -154,94 +154,94 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
 */
 @implementation CPTableView : CPControl
 {
-    id          _dataSource;
-    CPInteger   _implementedDataSourceMethods;
+    id                  _dataSource;
+    CPInteger           _implementedDataSourceMethods;
 
-    id          _delegate;
-    CPInteger   _implementedDelegateMethods;
+    id                  _delegate;
+    CPInteger           _implementedDelegateMethods;
 
-    CPArray     _tableColumns;
-    CPArray     _tableColumnRanges;
-    CPInteger   _dirtyTableColumnRangeIndex;
-    CPInteger   _numberOfHiddenColumns;
+    CPArray             _tableColumns;
+    CPArray             _tableColumnRanges;
+    CPInteger           _dirtyTableColumnRangeIndex;
+    CPInteger           _numberOfHiddenColumns;
 
-    BOOL        _reloadAllRows;
-    Object      _objectValues;
+    BOOL                _reloadAllRows;
+    Object              _objectValues;
 
-    CGRect      _exposedRect;
-    CPIndexSet  _exposedRows;
-    CPIndexSet  _exposedColumns;
+    CGRect              _exposedRect;
+    CPIndexSet          _exposedRows;
+    CPIndexSet          _exposedColumns;
 
-    Object      _dataViewsForTableColumns;
-    Object      _cachedDataViews;
+    Object              _dataViewsForTableColumns;
+    Object              _cachedDataViews;
 
     //Configuring Behavior
-    BOOL        _allowsColumnReordering;
-    BOOL        _allowsColumnResizing;
-    BOOL        _allowsColumnSelection;
-    BOOL        _allowsMultipleSelection;
-    BOOL        _allowsEmptySelection;
+    BOOL                _allowsColumnReordering;
+    BOOL                _allowsColumnResizing;
+    BOOL                _allowsColumnSelection;
+    BOOL                _allowsMultipleSelection;
+    BOOL                _allowsEmptySelection;
 
-    CPArray     _sortDescriptors;
+    CPArray             _sortDescriptors;
 
     //Setting Display Attributes
-    CGSize      _intercellSpacing;
-    float       _rowHeight;
+    CGSize              _intercellSpacing;
+    float               _rowHeight;
 
-    BOOL        _usesAlternatingRowBackgroundColors;
-    CPArray     _alternatingRowBackgroundColors;
+    BOOL                _usesAlternatingRowBackgroundColors;
+    CPArray             _alternatingRowBackgroundColors;
 
-    unsigned    _selectionHighlightStyle;
-    CPTableColumn _currentHighlightedTableColumn;
-    unsigned    _gridStyleMask;
+    unsigned            _selectionHighlightStyle;
+    CPTableColumn       _currentHighlightedTableColumn;
+    unsigned            _gridStyleMask;
 
-    unsigned    _numberOfRows;
-    CPIndexSet  _groupRows;
+    unsigned            _numberOfRows;
+    CPIndexSet          _groupRows;
 
-    CPArray    _cachedRowHeights;
+    CPArray             _cachedRowHeights;
 
     // Persistence
-    CPString                _autosaveName;
-    BOOL                    _autosaveTableColumns;
+    CPString            _autosaveName;
+    BOOL                _autosaveTableColumns;
 
-    CPTableHeaderView _headerView;
-    _CPCornerView     _cornerView;
+    CPTableHeaderView   _headerView;
+    _CPCornerView       _cornerView;
 
-    CPIndexSet  _selectedColumnIndexes;
-    CPIndexSet  _selectedRowIndexes;
-    CPInteger   _selectionAnchorRow;
-    CPInteger   _lastSelectedRow;
-    CPIndexSet  _previouslySelectedRowIndexes;
-    CGPoint     _startTrackingPoint;
-    CPDate      _startTrackingTimestamp;
-    BOOL        _trackingPointMovedOutOfClickSlop;
-    CGPoint     _editingCellIndex;
+    CPIndexSet          _selectedColumnIndexes;
+    CPIndexSet          _selectedRowIndexes;
+    CPInteger           _selectionAnchorRow;
+    CPInteger           _lastSelectedRow;
+    CPIndexSet          _previouslySelectedRowIndexes;
+    CGPoint             _startTrackingPoint;
+    CPDate              _startTrackingTimestamp;
+    BOOL                _trackingPointMovedOutOfClickSlop;
+    CGPoint             _editingCellIndex;
 
-    _CPTableDrawView _tableDrawView;
+    _CPTableDrawView    _tableDrawView;
 
-    SEL         _doubleAction;
-    CPInteger   _clickedRow;
-    unsigned    _columnAutoResizingStyle;
+    SEL                 _doubleAction;
+    CPInteger           _clickedRow;
+    unsigned            _columnAutoResizingStyle;
 
-    int         _lastTrackedRowIndex;
-    CGPoint     _originalMouseDownPoint;
-    BOOL        _verticalMotionCanDrag;
-    unsigned    _destinationDragStyle;
-    BOOL        _isSelectingSession;
-    CPIndexSet  _draggedRowIndexes;
-    BOOL        _wasSelectionBroken;
+    int                 _lastTrackedRowIndex;
+    CGPoint             _originalMouseDownPoint;
+    BOOL                _verticalMotionCanDrag;
+    unsigned            _destinationDragStyle;
+    BOOL                _isSelectingSession;
+    CPIndexSet          _draggedRowIndexes;
+    BOOL                _wasSelectionBroken;
 
     _CPDropOperationDrawingView _dropOperationFeedbackView;
-    CPDragOperation             _dragOperationDefaultMask;
-    int                         _retargetedDropRow;
-    CPDragOperation             _retargetedDropOperation;
+    CPDragOperation     _dragOperationDefaultMask;
+    int                 _retargetedDropRow;
+    CPDragOperation     _retargetedDropOperation;
 
-    BOOL        _disableAutomaticResizing @accessors(property=disableAutomaticResizing);
-    BOOL        _lastColumnShouldSnap;
-    BOOL        _implementsCustomDrawRow;
+    BOOL                _disableAutomaticResizing @accessors(property=disableAutomaticResizing);
+    BOOL                _lastColumnShouldSnap;
+    BOOL                _implementsCustomDrawRow;
 
-    CPTableColumn _draggedColumn;
-    CPArray     _differedColumnDataToRemove;
+    CPTableColumn       _draggedColumn;
+    CPArray             _differedColumnDataToRemove;
 }
 
 /*!
@@ -341,14 +341,14 @@ CPTableViewFirstColumnOnlyAutoresizingStyle = 5;
     _dirtyTableColumnRangeIndex = 0;
     _numberOfHiddenColumns = 0;
 
-        _objectValues = { };
-        _dataViewsForTableColumns = { };
-        _dataViews =  [];
-        _numberOfRows = 0;
-        _exposedRows = [CPIndexSet indexSet];
-        _exposedColumns = [CPIndexSet indexSet];
-        _cachedDataViews = { };
-        _cachedRowHeights = [];
+    _objectValues = { };
+    _dataViewsForTableColumns = { };
+    _dataViews =  [];
+    _numberOfRows = 0;
+    _exposedRows = [CPIndexSet indexSet];
+    _exposedColumns = [CPIndexSet indexSet];
+    _cachedDataViews = { };
+    _cachedRowHeights = [];
 
     _groupRows = [CPIndexSet indexSet];
 
@@ -1573,10 +1573,9 @@ NOT YET IMPLEMENTED
 
     UPDATE_COLUMN_RANGES_IF_NECESSARY();
 
-    var range = _tableColumnRanges[aColumnIndex],
-        spacing = _intercellSpacing.width || 1;
+    var range = _tableColumnRanges[aColumnIndex];
 
-    return _CGRectMake(range.location + spacing, 0.0, range.length - (2 * spacing), _CGRectGetHeight([self bounds]));
+    return _CGRectMake(range.location, 0.0, range.length, _CGRectGetHeight([self bounds]));
 }
 
 // Complexity:
@@ -3506,8 +3505,8 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
     var exposedRect = [self exposedRect];
 
     [self drawBackgroundInClipRect:exposedRect];
-    [self drawGridInClipRect:exposedRect];
     [self highlightSelectionInClipRect:exposedRect];
+    [self drawGridInClipRect:exposedRect];
 
     if (_implementsCustomDrawRow)
         [self _drawRows:_exposedRows clipRect:exposedRect];
@@ -3628,11 +3627,10 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
             minY = _CGRectGetMinY(aRect),
             maxY = _CGRectGetMaxY(aRect);
 
-
         for (; columnArrayIndex < columnArrayCount; ++columnArrayIndex)
         {
             var columnRect = [self rectOfColumn:columnsArray[columnArrayIndex]],
-                columnX = _CGRectGetMaxX(columnRect) + 0.5;
+                columnX = _CGRectGetMaxX(columnRect) +  0.5;
 
             CGContextMoveToPoint(context, columnX, minY);
             CGContextAddLineToPoint(context, columnX, maxY);
@@ -3666,7 +3664,6 @@ Your delegate can implement this method to avoid subclassing the tableview to ad
 
         [_selectedRowIndexes getIndexes:indexes maxCount:-1 inIndexRange:exposedRange];
     }
-
     else if ([_selectedColumnIndexes count] >= 1)
     {
         rectSelector = @selector(rectOfColumn:);
