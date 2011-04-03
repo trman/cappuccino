@@ -1,9 +1,9 @@
 /*
- * main.j
- * ArrayController1
+ * AppController.j
+ * test
  *
- * Created by Alexander Ljungberg on April 2, 2011.
- * Copyright 2011, WireLoad All rights reserved.
+ * Created by aparajita on March 9, 2011.
+ * Copyright 2011, Victory-Heart Productions All rights reserved.
  */
 
 @import <Foundation/Foundation.j>
