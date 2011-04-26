@@ -851,7 +851,7 @@ var _CPToolbarItemInfoMake = function(anIndex, aView, aLabel, aMinWidth)
         _viewsForToolbarItems[[item UID]] = view;
 
         if ([item toolTip] && [view respondsToSelector:@selector(setToolTip:)])
-             [view setToolTip:[item toolTip]];
+            [view setToolTip:[item toolTip]];
 
         [self addSubview:view];
 
