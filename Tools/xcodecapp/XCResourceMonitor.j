@@ -56,6 +56,10 @@ var FILE = require("file"),
         }
     });
 
+    paths.exclude(FILE.join("Build", "**", "*"));
+
+    var mtimesForFilePaths = [CPMutableDictionary new];
+
     paths.forEach(function(aPath)
     {
         var time = [m_mtimesForFilePaths objectForKey:aPath],
