@@ -10,7 +10,5 @@
 	<string>AppKit</string>
 	<key>CPBundlePackageType</key>
 	<string>FMWK</string>
-	<key>CPSystemFontFace</key>
-    <string>"Lucida Sans", Arial, sans-serif</string>
 </dict>
 </plist>
