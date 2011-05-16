@@ -29,13 +29,11 @@ _CPToolTipWindowMask = 1 << 27;
 var _CPToolTipHeight = 24.0,
     _CPToolTipFontSize = 11.0,
     _CPCurrentToolTip,
-    _CPCurrentToolTipTimer;
-
-
+    _CPCurrentToolTipTimer,
+    _CPToolTipDelay = 1.0;
 
 /*! @ingroup appkit
-    This is a basic tooltip that behaves mostlt like
-    Cocoa ones.
+    This is a basic tooltip that behaves mostly like Cocoa ones.
 */
 @implementation _CPToolTip : CPWindow
 {
@@ -46,7 +44,7 @@ var _CPToolTipHeight = 24.0,
 #pragma mark -
 #pragma mark Class Methods
 
-/*! returns an initialized _CPToolTip with string and attach it to given view
+/*! Returns an initialized _CPToolTip with the given text and attach it to given view.
     @param aString the content of the tooltip
 */
 + (_CPToolTip)toolTipWithString:(CPString)aString
@@ -58,15 +56,28 @@ var _CPToolTipHeight = 24.0,
     return tooltip;
 }
 
-/*! compute a cool size for the given string
-    @param aToolTipSize the original wanted tool tip size
+/*!
+    Compute a cool size for the given string.
+
+    @param aToolTipSize a frame with the maximum width desired for the tooltip
     @param aText the wanted text
     @return CPArray containing the computer toolTipSize and textFrameSize
 */
 + (CPSize)computeCorrectSize:(CPSize)aToolTipSize text:(CPString)aText
 {
     var font = [CPFont systemFontOfSize:_CPToolTipFontSize],
+        textFrameSizeSingleLine = [aText sizeWithFont:font],
         textFrameSize = [aText sizeWithFont:font inWidth:(aToolTipSize.width)];
+
+    // If the text fully fits within the maximum width, shrink to fit.
+    if (textFrameSizeSingleLine.width < aToolTipSize.width)
+    {
+        var textField = [[CPTextField alloc] initWithFrame:CGRectMakeZero()],
+            inset = [textField currentValueForThemeAttribute:@"content-inset"] || CGInsetMakeZero();
+        textFrameSize = textFrameSizeSingleLine;
+        textFrameSize.width += inset.left + inset.right;
+        aToolTipSize.width = textFrameSize.width;
+    }
 
     if (textFrameSize.height < 100)
     {
@@ -82,7 +93,9 @@ var _CPToolTipHeight = 24.0,
     return [aToolTipSize, textFrameSize];
 }
 
-/*! override default windowView class loader
+/*!
+    Override default windowView class loader.
+
     @param aStyleMask the window mask
     @return the windowView class
 */
@@ -95,7 +108,9 @@ var _CPToolTipHeight = 24.0,
 #pragma mark -
 #pragma mark Initialization
 
-/*! returns an initialized _CPToolTip with string
+/*!
+    Returns an initialized _CPToolTip with string.
+
     @param aString the content of the tooltip
     @param aStyleMask the tooltip's style mask
 */
@@ -137,7 +152,7 @@ var _CPToolTipHeight = 24.0,
 #pragma mark Controls
 
 /*!
-    Show the tooltip after computing the position
+    Show the tooltip after computing the position.
 */
 - (void)showToolTip
 {
@@ -164,7 +179,7 @@ var _CPToolTipHeight = 24.0,
 
 
 /*! @ingroup appkit
-    Make CPView supporting toolTips.
+    Add tooltip support to CPView.
 */
 @implementation CPView (toolTips)
 
@@ -183,10 +198,12 @@ var _CPToolTipHeight = 24.0,
     if (!_DOMElement)
         return;
 
-    var fIn = function(e){
+    var fIn = function(e)
+        {
             [self _fireToolTip];
-        };
-        fOut = function(e){
+        },
+        fOut = function(e)
+        {
             [self _invalidateToolTip];
         };
 
@@ -224,7 +241,7 @@ var _CPToolTipHeight = 24.0,
 }
 
 /*!
-    Returns the receiver's tooltip
+    Returns the receiver's tooltip.
 */
 - (CPString)toolTip
 {
@@ -232,7 +249,7 @@ var _CPToolTipHeight = 24.0,
 }
 
 /*! @ignore
-    starts the tooltip timer
+    Starts the tooltip timer.
 */
 - (void)_fireToolTip
 {
@@ -245,7 +262,7 @@ var _CPToolTipHeight = 24.0,
     }
 
     if (_toolTip)
-        _CPCurrentToolTipTimer = [CPTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(_showToolTip:) userInfo:nil repeats:NO];
+        _CPCurrentToolTipTimer = [CPTimer scheduledTimerWithTimeInterval:_CPToolTipDelay target:self selector:@selector(_showToolTip:) userInfo:nil repeats:NO];
 }
 
 /*! @ignore
