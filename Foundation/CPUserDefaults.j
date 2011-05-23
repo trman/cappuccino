@@ -380,11 +380,11 @@ var StandardUserDefaults;
 #pragma mark Getting Default Values
 
 /*!
-    Returns the array value associated with the specified key in specified domain.
+    Returns the array value associated with the specified key.
 */
-- (CPArray)arrayForKey:(CPString)aKey inDomain:(CPString)aDomain
+- (CPArray)arrayForKey:(CPString)aKey
 {
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if ([value isKindOfClass:CPArray])
         return value;
 
@@ -392,60 +392,25 @@ var StandardUserDefaults;
 }
 
 /*!
-    Returns the array value associated with the specified key.
+    Returns the Boolean value associated with the specified key.
 */
-- (CPArray)arrayForKey:(CPString)aKey
+- (BOOL)boolForKey:(CPString)aKey
 {
-    return [self arrayForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the Boolean value associated with the specified key in specified domain.
-*/
-- (BOOL)boolForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if ([value respondsToSelector:@selector(boolValue)])
         return [value boolValue];
 
     return NO;
 }
 
-/*!
-    Returns the Boolean value associated with the specified key.
-*/
-- (BOOL)boolForKey:(CPString)aKey
-{
-    return [self boolForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the data object associated with the specified key in specified domain.
-*/
-- (CPData)dataForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
-    if ([value isKindOfClass:CPData])
-        return value;
-
-    return nil;
-}
 
 /*!
     Returns the data object associated with the specified key.
 */
 - (CPData)dataForKey:(CPString)aKey
 {
-    return [self dataForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the Boolean value associated with the specified key in specified domain.
-*/
-- (CPDictionary)dictionaryForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
-    if ([value isKindOfClass:CPDictionary])
+    var value = [self objectForKey:aKey];
+    if ([value isKindOfClass:CPData])
         return value;
 
     return nil;
@@ -456,15 +421,19 @@ var StandardUserDefaults;
 */
 - (CPDictionary)dictionaryForKey:(CPString)aKey
 {
-    return [self dictionaryForKey:aKey inDomain:CPApplicationDomain]
+    var value = [self objectForKey:aKey];
+    if ([value isKindOfClass:CPDictionary])
+        return value;
+
+    return nil;
 }
 
 /*!
-    Returns the float value associated with the specified key in specified domain.
+    Returns the float value associated with the specified key.
 */
-- (float)floatForKey:(CPString)aKey inDomain:(CPString)aDomain
+- (float)floatForKey:(CPString)aKey
 {
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if (value === nil)
         return 0;
 
@@ -475,19 +444,11 @@ var StandardUserDefaults;
 }
 
 /*!
-    Returns the float value associated with the specified key.
+    Returns the integer value associated with the specified key.
 */
-- (float)floatForKey:(CPString)aKey
+- (int)integerForKey:(CPString)aKey
 {
-    return [self floatForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the integer value associated with the specified key in specified domain.
-*/
-- (int)integerForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if (value === nil)
         return 0;
 
@@ -498,35 +459,19 @@ var StandardUserDefaults;
 }
 
 /*!
-    Returns the integer value associated with the specified key.
-*/
-- (int)integerForKey:(CPString)aKey
-{
-    return [self integerForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the double value associated with the specified key in specified domain.
-*/
-- (double)doubleForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    return [self floatForKey:aKey inDomain:aDomain];
-}
-
-/*!
     Returns the double value associated with the specified key.
 */
 - (double)doubleForKey:(CPString)aKey
 {
-    return [self doubleForKey:aKey inDomain:CPApplicationDomain];
+    return [self floatForKey:aKey];
 }
 
 /*!
-    Returns the string value associated with the specified key in specified domain.
+    Returns the string value associated with the specified key.
 */
-- (CPString)stringForKey:(CPString)aKey inDomain:(CPString)aDomain
+- (CPString)stringForKey:(CPString)aKey
 {
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
 
     if ([value isKindOfClass:CPString])
         return value;
@@ -538,19 +483,11 @@ var StandardUserDefaults;
 }
 
 /*!
-    Returns the string value associated with the specified key.
+    Returns the string array value associated with the specified key.
 */
-- (CPString)stringForKey:(CPString)aKey
+- (CPArray)stringArrayForKey:(CPString)aKey
 {
-    return [self stringForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the string array value associated with the specified key in specified domain.
-*/
-- (CPArray)stringArrayForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if (![value isKindOfClass:CPArray])
         return nil;
 
@@ -562,19 +499,11 @@ var StandardUserDefaults;
 }
 
 /*!
-    Returns the string array value associated with the specified key.
+    Returns the CPURL value associated with the specified key.
 */
-- (CPArray)stringArrayForKey:(CPString)aKey
+- (CPURL)URLForKey:(CPString)aKey
 {
-    return [self stringArrayForKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Returns the CPURL value associated with the specified key in specified domain.
-*/
-- (CPURL)URLForKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    var value = [self objectForKey:aKey inDomain:aDomain] || [self objectForKey:aKey];
+    var value = [self objectForKey:aKey];
     if ([value isKindOfClass:CPURL])
         return value;
 
@@ -584,26 +513,7 @@ var StandardUserDefaults;
     return nil;
 }
 
-/*!
-    Returns the CPURL value associated with the specified key.
-*/
-- (CPURL)URLForKey:(CPString)aKey
-{
-    return [self URLForKey:aKey inDomain:CPApplicationDomain];
-}
-
-
 #pragma mark Setting Default Values
-
-/*!
-    Sets the value of the specified default key to the specified Boolean value in specified domain.
-    A cast will be attempted with -boolValue.
-*/
-- (void)setBool:(BOOL)aValue forKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    if ([aValue respondsToSelector:@selector(boolValue)])
-        [self setObject:[aValue boolValue] forKey:aKey inDomain:aDomain];
-}
 
 /*!
     Sets the value of the specified default key to the specified Boolean value.
@@ -611,19 +521,8 @@ var StandardUserDefaults;
 */
 - (void)setBool:(BOOL)aValue forKey:(CPString)aKey
 {
-    [self setBool:aValue forKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Sets the value of the specified default key to the specified float value in specified domain.
-    A cast will be attempted with -floatValue and parseFloat().
-*/
-- (void)setFloat:(float)aValue forKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    if ([aValue respondsToSelector:@selector(aValue)])
-        aValue = [aValue floatValue];
-
-    [self setObject:parseFloat(aValue) forKey:aKey inDomain:aDomain];
+    if ([aValue respondsToSelector:@selector(boolValue)])
+        [self setObject:[aValue boolValue] forKey:aKey];
 }
 
 /*!
@@ -632,15 +531,10 @@ var StandardUserDefaults;
 */
 - (void)setFloat:(float)aValue forKey:(CPString)aKey
 {
-    [self setFloat:aValue forKey:aKey inDomain:CPApplicationDomain];
-}
+    if ([aValue respondsToSelector:@selector(aValue)])
+        aValue = [aValue floatValue];
 
-/*!
-    Sets the value of the specified default key to the double value in specified domain.
-*/
-- (void)setDouble:(double)aValue forKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    [self setFloat:aValue forKey:aKey inDomain:aDomain];
+    [self setObject:parseFloat(aValue) forKey:aKey];
 }
 
 /*!
@@ -648,19 +542,7 @@ var StandardUserDefaults;
 */
 - (void)setDouble:(double)aValue forKey:(CPString)aKey
 {
-    [self setDouble:aValue forKey:aKey inDomain:CPApplicationDomain];
-}
-
-/*!
-    Sets the value of the specified default key to the specified integer value in specified domain.
-    A cast will be attempted with -intValue and parseInt().
-*/
-- (void)setInteger:(int)aValue forKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    if ([aValue respondsToSelector:@selector(intValue)])
-        aValue = [aValue intValue];
-
-    [self setObject:parseInt(aValue) forKey:aKey inDomain:aDomain];
+    [self setFloat:aValue forKey:aKey];
 }
 
 /*!
@@ -669,19 +551,10 @@ var StandardUserDefaults;
 */
 - (void)setInteger:(int)aValue forKey:(CPString)aKey
 {
-    [self setInteger:aValue forKey:aKey inDomain:CPApplicationDomain];
-}
+    if ([aValue respondsToSelector:@selector(intValue)])
+        aValue = [aValue intValue];
 
-/*!
-    Sets the value of the specified default key to the specified URL in specified domain.
-    The adjustments made in Cocoa are not present here.
-*/
-- (void)setURL:(CPURL)aValue forKey:(CPString)aKey inDomain:(CPString)aDomain
-{
-    if ([aValue isKindOfClass:CPString])
-        aValue = [CPURL URLWithString:aValue];
-
-    [self setObject:aValue forKey:aKey inDomain:aDomain];
+    [self setObject:parseInt(aValue) forKey:aKey];
 }
 
 /*!
@@ -690,9 +563,11 @@ var StandardUserDefaults;
 */
 - (void)setURL:(CPURL)aValue forKey:(CPString)aKey
 {
-    [self setURL:aValue forKey:aKey inDomain:CPApplicationDomain];
-}
+    if ([aValue isKindOfClass:CPString])
+        aValue = [CPURL URLWithString:aValue];
 
+    [self setObject:aValue forKey:aKey];
+}
 
 @end
 
