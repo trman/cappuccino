@@ -1,9 +1,9 @@
 /*
- * Platform.h
- * AppKit
+ * Ref.h
+ * Foundation
  *
- * Created by Francisco Tolmasky.
- * Copyright 2008, 280 North, Inc.
+ * Created by Alexander Ljungberg.
+ * Copyright 2011, WireLoad Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,4 +20,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#define PLATFORM(FEATURE) (defined( PLATFORM_##FEATURE ) && PLATFORM_##FEATURE)
+/*
+Temporary macros to substitute for @ref and @deref functionality in a future version of Objective-J. Since these are C macros rather than a part of Preprocessor.js they can only be used within Cappuccino itself.
+*/
+
+// @ref
+#define AT_REF(x) function(__input) { if (arguments.length) return x = __input; return x; }
+// @deref (kind of)
+#define AT_DEREF(x, ...) x(##__VA_ARGS__)
