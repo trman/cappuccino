@@ -746,9 +746,6 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 
 - (void)keyDown:(CPEvent)anEvent
 {
-    if ([anEvent _couldBeKeyEquivalent] && [self performKeyEquivalent:anEvent])
-        return;
-
     // CPTextField uses an HTML input element to take the input so we need to
     // propagate the dom event so the element is updated. This has to be done
     // before interpretKeyEvents: though so individual commands have a chance
@@ -779,14 +776,21 @@ CPTextFieldStatePlaceholder = CPThemeState("placeholder");
 {
     if ([self _valueIsValid:_stringValue])
     {
+        // If _isEditing == YES then the target action can also be called via
+        // resignFirstResponder, and it is possible that the target action
+        // itself will change this textfield's responder status, so start by
+        // setting the _isEditing flag to NO to prevent the target action being
+        // called twice (once below and once from resignFirstResponder).
+        if (_isEditing)
+        {
+            _isEditing = NO;
+            [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
+        }
+
+        // If there is no target action, or the sendAction call returns
+        // success.
         if (![self action] || [self sendAction:[self action] to:[self target]])
         {
-            if (_isEditing)
-            {
-                _isEditing = NO;
-                [self textDidEndEditing:[CPNotification notificationWithName:CPControlTextDidEndEditingNotification object:self userInfo:nil]];
-            }
-
             [self selectAll:nil];
         }
     }
