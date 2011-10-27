@@ -14,16 +14,24 @@
     CPWindow                theWindow; //this "outlet" is connected automatically by the Cib
     @outlet CPScrollView    scrollView;
     @outlet CPView          contentView;
+
+    @outlet CPScrollView    scrollView2;
+    @outlet CPView          contentView2;
+
+    CPColor lightBackground;
 }
 
 - (void)awakeFromCib
 {
     [theWindow setFullPlatformWindow:YES];
 
-    [contentView setBackgroundColor:[CPColor colorWithHexString:@"f3f3f3"]];
+    lightBackground = [CPColor colorWithPatternImage:[[CPImage alloc] initWithContentsOfFile:[[CPBundle mainBundle] pathForResource:@"photo.jpg"]]];
+    [contentView setBackgroundColor:lightBackground];
     [contentView setAutoresizingMask:CPViewWidthSizable];
-    // [scrollView setAutohidesScrollers:YES];
+
     [scrollView setDocumentView:contentView];
+    [contentView2 setAutoresizingMask:CPViewWidthSizable];
+    [scrollView2 setDocumentView:contentView2];
 }
 
 - (IBAction)change:(id)aSender
@@ -38,7 +46,7 @@
 {
     var style = [aSender title];
 
-    switch(style)
+    switch (style)
     {
         case "Default":
             [scrollView setScrollerKnobStyle:CPScrollerKnobStyleDefault];
@@ -56,10 +64,10 @@
 {
     var style = [aSender title];
 
-    switch(style)
+    switch (style)
     {
         case "Light":
-            [[scrollView documentView] setBackgroundColor:[CPColor colorWithHexString:@"f3f3f3"]];
+            [[scrollView documentView] setBackgroundColor:lightBackground];
             break;
         case "Dark":
             [[scrollView documentView] setBackgroundColor:[CPColor colorWithHexString:@"333"]];
@@ -74,12 +82,34 @@
 
 - (IBAction)makeSmallDocView:(id)aSender
 {
-    [contentView setFrameSize:CPSizeMake(30, 30)];
+    [contentView setFrameSize:CPSizeMake(200, 200)];
+}
+
+- (IBAction)makeNarrowDocView:(id)aSender
+{
+    [contentView setFrameSize:CPSizeMake(200, 1000)];
+}
+
+- (IBAction)makeShortDocView:(id)aSender
+{
+    [contentView setFrameSize:CPSizeMake(1000, 200)];
 }
 
 - (IBAction)flash:(id)aSender
 {
     [scrollView flashScrollers];
+}
+
+
+/*! documentation
+    @param aSender the sender of the action
+*/
+- (IBAction)changeSystemWideScrollerStyle:(id)aSender
+{
+    if ([CPScrollView globalScrollerStyle] == CPScrollerStyleOverlay)
+        [CPScrollView setGlobalScrollerStyle:CPScrollerStyleLegacy];
+    else
+        [CPScrollView setGlobalScrollerStyle:CPScrollerStyleOverlay];
 }
 
 @end

@@ -8,7 +8,6 @@
  * Modified to match Lion style by Antoine Mercadal 2011
  * <antoine.mercadal@archipelproject.org>
  *
- *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -24,11 +23,47 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+@import <Foundation/CPNotificationCenter.j>
+
 @import "CPBox.j"
 @import "CPClipView.j"
 @import "CPScroller.j"
 @import "CPView.j"
 
+
+/*! @ignore */
+var _isSystemUsingOverlayScrollers = function()
+{
+#if PLATFORM(DOM)
+  var inner = document.createElement('p'),
+      outer = document.createElement('div');
+
+  inner.style.width = "100%";
+  inner.style.height = "200px";
+
+  outer.style.position = "absolute";
+  outer.style.top = "0px";
+  outer.style.left = "0px";
+  outer.style.visibility = "hidden";
+  outer.style.width = "200px";
+  outer.style.height = "150px";
+  outer.style.overflow = "hidden";
+  outer.appendChild (inner);
+
+  document.body.appendChild (outer);
+  var w1 = inner.offsetWidth;
+  outer.style.overflow = 'scroll';
+  var w2 = inner.offsetWidth;
+  if (w1 == w2)
+    w2 = outer.clientWidth;
+
+  document.body.removeChild (outer);
+
+  return (w1 - w2 == 0);
+#else
+  return NO;
+#endif
+}
 
 /*!
     @ingroup appkit
@@ -41,8 +76,12 @@
 
 var TIMER_INTERVAL                              = 0.2,
     CPScrollViewDelegate_scrollViewWillScroll_  = 1 << 0,
-    CPScrollViewDelegate_scrollViewDidScroll_   = 1 << 1;
+    CPScrollViewDelegate_scrollViewDidScroll_   = 1 << 1,
 
+    CPScrollViewFadeOutTime                     = 1.3;
+
+var CPScrollerStyleGlobal                       = CPScrollerStyleOverlay,
+    CPScrollerStyleGlobalChangeNotification     = @"CPScrollerStyleGlobalChangeNotification";
 
 
 @implementation CPScrollView : CPView
@@ -81,6 +120,16 @@ var TIMER_INTERVAL                              = 0.2,
 
 #pragma mark -
 #pragma mark Class methods
+
++ (void)initialize
+{
+    var globalValue = [[CPBundle mainBundle] objectForInfoDictionaryKey:@"CPScrollersGlobalStyle"];
+
+    if (globalValue == nil || globalValue == -1)
+        CPScrollerStyleGlobal = _isSystemUsingOverlayScrollers() ? CPScrollerStyleOverlay : CPScrollerStyleLegacy
+    else
+        CPScrollerStyleGlobal = globalValue;
+}
 
 + (CPString)defaultThemeClass
 {
@@ -146,6 +195,25 @@ var TIMER_INTERVAL                              = 0.2,
     }
 }
 
+/*!
+    Get the system wide scroller style.
+*/
++ (int)globalScrollerStyle
+{
+    return CPScrollerStyleGlobal;
+}
+
+/*!
+    Set the system wide scroller style.
+
+    @param aStyle the scroller style to set all scroller views to use (CPScrollerStyleLegacy or CPScrollerStyleOverlay)
+*/
++ (int)setGlobalScrollerStyle:(int)aStyle
+{
+    CPScrollerStyleGlobal = aStyle;
+    [[CPNotificationCenter defaultCenter] postNotificationName:CPScrollerStyleGlobalChangeNotification object:nil];
+}
+
 
 #pragma mark -
 #pragma mark Initialization
@@ -176,11 +244,16 @@ var TIMER_INTERVAL                              = 0.2,
         [self setHasVerticalScroller:YES];
         [self setHasHorizontalScroller:YES];
         _scrollerKnobStyle = CPScrollerKnobStyleDefault;
-        [self setScrollerStyle:CPScrollerStyleOverlay];
+        [self setScrollerStyle:CPScrollerStyleGlobal];
 
         _delegate = nil;
         _scrollTimer = nil;
         _implementedDelegateMethods = 0;
+
+        [[CPNotificationCenter defaultCenter] addObserver:self
+                                 selector:@selector(_didReceiveDefaultStyleChange:)
+                                     name:CPScrollerStyleGlobalChangeNotification
+                                   object:nil];
     }
 
     return self;
@@ -191,7 +264,7 @@ var TIMER_INTERVAL                              = 0.2,
 #pragma mark Getters / Setters
 
 /*!
-    The delegate of the scrol view
+    The delegate of the scroll view
 */
 - (id)delegate
 {
@@ -225,9 +298,10 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Set the scroller styles
-    - CPScrollerStyleLegacy: Standard scroller like prior 10.7
-    - CPScrollerStyleOverlay: scrollers like 10.7+
+    Set the scroller style.
+
+    - CPScrollerStyleLegacy: Standard scrollers like Windows or Mac OS X prior to 10.7
+    - CPScrollerStyleOverlay: scrollers like those in Mac OS X 10.7+
 */
 - (void)setScrollerStyle:(int)aStyle
 {
@@ -239,11 +313,31 @@ var TIMER_INTERVAL                              = 0.2,
     [self _updateScrollerStyle];
 }
 
+/*!
+    Returns the style of the scroller knob, the bit which moves when scrolling, of the receiver.
+
+    Valid values are:
+    <pre>
+        CPScrollerKnobStyleLight
+        CPScrollerKnobStyleDark
+        CPScrollerKnobStyleDefault
+    </pre>
+*/
 - (int)scrollerKnobStyle
 {
     return _scrollerKnobStyle;
 }
 
+/*!
+    Sets the style of the scroller knob, the bit which moves when scrolling.
+
+    Valid values are:
+    <pre>
+        CPScrollerKnobStyleLight
+        CPScrollerKnobStyleDark
+        CPScrollerKnobStyleDefault
+    </pre>
+*/
 - (void)setScrollerKnobStyle:(int)newScrollerKnobStyle
 {
      if (_scrollerKnobStyle === newScrollerKnobStyle)
@@ -263,7 +357,8 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Sets the content view that clips the document
+    Sets the content view that clips the document.
+
     @param aContentView the content view
 */
 - (void)setContentView:(CPClipView)aContentView
@@ -288,7 +383,6 @@ var TIMER_INTERVAL                              = 0.2,
     [self reflectScrolledClipView:_contentView];
 }
 
-
 /*!
     Returns the size of the scroll view's content view.
 */
@@ -307,6 +401,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the view that is scrolled for the user.
+
     @param aView the view that will be scrolled
 */
 - (void)setDocumentView:(CPView)aView
@@ -328,6 +423,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the type of border to be drawn around the view.
+
     Valid types are:
     <pre>
     CPNoBorder
@@ -348,7 +444,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 
 /*!
-    Returns the scroll view's horizontal scroller
+    Returns the scroll view's horizontal scroller.
 */
 - (CPScroller)horizontalScroller
 {
@@ -357,6 +453,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the scroll view's horizontal scroller.
+
     @param aScroller the horizontal scroller for the scroll view
 */
 - (void)setHorizontalScroller:(CPScroller)aScroller
@@ -388,6 +485,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Specifies whether the scroll view can have a horizontal scroller.
+
     @param hasHorizontalScroller \c YES lets the scroll view
     allocate a horizontal scroller if necessary.
 */
@@ -410,7 +508,7 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Return's the scroll view's vertical scroller
+    Returns the scroll view's vertical scroller.
 */
 - (CPScroller)verticalScroller
 {
@@ -419,6 +517,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the scroll view's vertical scroller.
+
     @param aScroller the vertical scroller
 */
 - (void)setVerticalScroller:(CPScroller)aScroller
@@ -449,10 +548,11 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Specifies whether the scroll view has can have
-    a vertical scroller. It allocates it if necessary.
-    @param hasVerticalScroller \c YES allows
-    the scroll view to display a vertical scroller
+    Specifies whether the scroll view can have a vertical scroller.
+    It allocates it if necessary.
+
+    @param hasVerticalScroller \c YES allows the scroll view to
+    display a vertical scroller
 */
 - (void)setHasVerticalScroller:(BOOL)shouldHaveVerticalScroller
 {
@@ -473,8 +573,7 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Returns \c YES if the scroll view hides its scroll
-    bars when not necessary.
+    Returns \c YES if the scroll view hides its scroll bars when not necessary.
 */
 - (BOOL)autohidesScrollers
 {
@@ -483,6 +582,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets whether the scroll view hides its scroll bars when not needed.
+
     @param autohidesScrollers \c YES causes the scroll bars
     to be hidden when not needed.
 */
@@ -517,7 +617,7 @@ var TIMER_INTERVAL                              = 0.2,
 }
 
 /*!
-    Returns how much the document moves when scrolled
+    Returns how much the document moves when scrolled.
 */
 - (float)lineScroll
 {
@@ -526,6 +626,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets how much the document moves when scrolled. Sets the vertical and horizontal scroll.
+
     @param aLineScroll the amount to move the document when scrolled
 */
 - (void)setLineScroll:(float)aLineScroll
@@ -544,6 +645,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets how much the document moves when scrolled horizontally.
+
     @param aLineScroll the amount to move horizontally when scrolled.
 */
 - (void)setHorizontalLineScroll:(float)aLineScroll
@@ -561,6 +663,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets how much the document moves when scrolled vertically.
+
     @param aLineScroll the new amount to move vertically when scrolled.
 */
 - (void)setVerticalLineScroll:(float)aLineScroll
@@ -578,6 +681,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the horizontal and vertical page scroll amount.
+
     @param aPageScroll the new horizontal and vertical page scroll amount
 */
 - (void)setPageScroll:(float)aPageScroll
@@ -596,6 +700,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the horizontal page scroll amount.
+
     @param aPageScroll the new horizontal page scroll amount
 */
 - (void)setHorizontalPageScroll:(float)aPageScroll
@@ -613,6 +718,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Sets the vertical page scroll amount.
+
     @param aPageScroll the new vertical page scroll amount
 */
 - (void)setVerticalPageScroll:(float)aPageScroll
@@ -670,8 +776,11 @@ var TIMER_INTERVAL                              = 0.2,
     {
         if (_timerScrollersHide)
             [_timerScrollersHide invalidate];
-        _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:1.2 target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
+        _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:CPScrollViewFadeOutTime target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
+        [[self bottomCornerView] setHidden:YES];
     }
+    else
+        [[self bottomCornerView] setHidden:NO];
 
     [self reflectScrolledClipView:_contentView];
 }
@@ -907,6 +1016,13 @@ var TIMER_INTERVAL                              = 0.2,
         [_delegate scrollViewDidScroll:self];
 }
 
+/*! @ignore*/
+- (void)_didReceiveDefaultStyleChange:(CPNotification)aNotification
+{
+    [self setScrollerStyle:CPScrollerStyleGlobal];
+}
+
+
 
 #pragma mark -
 #pragma mark Utilities
@@ -924,6 +1040,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Resizes the scroll view to contain the specified clip view.
+
     @param aClipView the clip view to resize to
 */
 - (void)reflectScrolledClipView:(CPClipView)aClipView
@@ -1015,6 +1132,10 @@ var TIMER_INTERVAL                              = 0.2,
 
         var verticalScrollerHeight = _CGRectGetMaxY(contentFrame) - verticalScrollerY;
 
+        // Make a gap at the bottom of the vertical scroller so that the horizontal and vertical can't overlap.
+        if (_scrollerStyle === CPScrollerStyleOverlay && hasHorizontalScroll)
+            verticalScrollerHeight -= horizontalScrollerHeight;
+
         [_verticalScroller setFloatValue:(difference.height <= 0.0) ? 0.0 : scrollPoint.y / difference.height];
         [_verticalScroller setKnobProportion:_CGRectGetHeight(contentFrame) / _CGRectGetHeight(documentFrame)];
         [_verticalScroller setFrame:_CGRectMake(_CGRectGetMaxX(contentFrame) - overlay, verticalScrollerY, verticalScrollerWidth, verticalScrollerHeight)];
@@ -1027,9 +1148,14 @@ var TIMER_INTERVAL                              = 0.2,
 
     if (shouldShowHorizontalScroller)
     {
+        var horizontalScrollerWidth = _CGRectGetWidth(contentFrame);
+        // Make a gap at the bottom of the vertical scroller so that the horizontal and vertical can't overlap.
+        if (_scrollerStyle === CPScrollerStyleOverlay && hasVerticalScroll)
+            horizontalScrollerWidth -= verticalScrollerWidth;
+
         [_horizontalScroller setFloatValue:(difference.width <= 0.0) ? 0.0 : scrollPoint.x / difference.width];
         [_horizontalScroller setKnobProportion:_CGRectGetWidth(contentFrame) / _CGRectGetWidth(documentFrame)];
-        [_horizontalScroller setFrame:_CGRectMake(_CGRectGetMinX(contentFrame), _CGRectGetMaxY(contentFrame) - overlay, _CGRectGetWidth(contentFrame), horizontalScrollerHeight)];
+        [_horizontalScroller setFrame:_CGRectMake(_CGRectGetMinX(contentFrame), _CGRectGetMaxY(contentFrame) - overlay, horizontalScrollerWidth, horizontalScrollerHeight)];
     }
     else if (wasShowingHorizontalScroller)
     {
@@ -1042,28 +1168,38 @@ var TIMER_INTERVAL                              = 0.2,
     [[_headerClipView documentView] setNeedsDisplay:YES];
     [_cornerView setFrame:[self _cornerViewFrame]];
 
-    [[self bottomCornerView] setFrame:[self _bottomCornerViewFrame]];
-    [[self bottomCornerView] setBackgroundColor:[self currentValueForThemeAttribute:@"bottom-corner-color"]];
+    if (_scrollerStyle === CPScrollerStyleLegacy)
+    {
+        [[self bottomCornerView] setFrame:[self _bottomCornerViewFrame]];
+        [[self bottomCornerView] setBackgroundColor:[self currentValueForThemeAttribute:@"bottom-corner-color"]];
+    }
 
     --_recursionCount;
 }
 
 /*!
-    Momentary display the scrollers
+    Momentarily display the scrollers if the scroller style is CPScrollerStyleOverlay.
 */
 - (void)flashScrollers
 {
-    if (_scrollerStyle == CPScrollerStyleLegacy)
+    if (_scrollerStyle === CPScrollerStyleLegacy)
         return;
 
     if (_hasHorizontalScroller)
+    {
+        [_horizontalScroller setHidden:NO];
         [_horizontalScroller fadeIn];
+    }
+
     if (_hasVerticalScroller)
+    {
+        [_verticalScroller setHidden:NO];
         [_verticalScroller fadeIn];
+    }
 
     if (_timerScrollersHide)
         [_timerScrollersHide invalidate]
-    _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:1.2 target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
+    _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:CPScrollViewFadeOutTime target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
 }
 
 /* @ignore */
@@ -1198,6 +1334,7 @@ var TIMER_INTERVAL                              = 0.2,
 
 /*!
     Handles a scroll wheel event from the user.
+
     @param anEvent the scroll wheel event
 */
 - (void)scrollWheel:(CPEvent)anEvent
@@ -1209,7 +1346,7 @@ var TIMER_INTERVAL                              = 0.2,
     if (![_horizontalScroller isHidden])
         [_horizontalScroller fadeIn];
     if (![_horizontalScroller isHidden] || ![_verticalScroller isHidden])
-        _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:1.2 target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
+        _timerScrollersHide = [CPTimer scheduledTimerWithTimeInterval:CPScrollViewFadeOutTime target:self selector:@selector(_hideScrollers:) userInfo:nil repeats:NO];
 
     [self _respondToScrollWheelEventWithDeltaX:[anEvent deltaX] deltaY:[anEvent deltaY]];
 }
@@ -1334,8 +1471,13 @@ var CPScrollViewContentViewKey          = @"CPScrollViewContentView",
         // Due to the anything goes nature of decoding, our subviews may not exist yet, so layout at the end of the run loop when we're sure everything is in a correct state.
         [[CPRunLoop currentRunLoop] performSelector:@selector(_updateCornerAndHeaderView) target:self argument:_contentView order:0 modes:[CPDefaultRunLoopMode]];
 
-        [self setScrollerStyle:[aCoder decodeIntForKey:CPScrollViewScrollerStyleKey] || CPScrollerStyleOverlay];
+        [self setScrollerStyle:[aCoder decodeIntForKey:CPScrollViewScrollerStyleKey] || CPScrollerStyleGlobal];
         [self setScrollerKnobStyle:[aCoder decodeIntForKey:CPScrollViewScrollerKnobStyleKey] || CPScrollerKnobStyleDefault];
+
+        [[CPNotificationCenter defaultCenter] addObserver:self
+                                 selector:@selector(_didReceiveDefaultStyleChange:)
+                                     name:CPScrollerStyleGlobalChangeNotification
+                                   object:nil];
     }
 
     return self;
