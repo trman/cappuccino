@@ -39,7 +39,7 @@ CPPopoverBehaviorSemitransient      = 2;
 var CPPopoverDelegate_popover_willShow_     = 1 << 0,
     CPPopoverDelegate_popover_didShow_      = 1 << 1,
     CPPopoverDelegate_popover_shouldClose_  = 1 << 2,
-    CPPopoverDelegate_popover_willClose_   = 1 << 3,
+    CPPopoverDelegate_popover_willClose_    = 1 << 3,
     CPPopoverDelegate_popover_didClose_     = 1 << 4;
 
 
@@ -274,7 +274,7 @@ var CPPopoverDelegate_popover_willShow_     = 1 << 0,
 #pragma mark Delegates
 
 /*! @ignore */
-- (BOOL)didAttachedWindowShouldClose:(_CPAttachedWindow)anAttachedWindow
+- (BOOL)attachedWindowShouldClose:(_CPAttachedWindow)anAttachedWindow
 {
     [self close];
 
